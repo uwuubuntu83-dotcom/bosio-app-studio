@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: bosio-app-studio
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: python -m bosio.server
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.6
