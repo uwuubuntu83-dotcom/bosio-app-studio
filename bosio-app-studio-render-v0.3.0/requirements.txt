@@ -1,0 +1,1 @@
+# BOSIO no requiere dependencias externas
