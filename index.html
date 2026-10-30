@@ -300,6 +300,8 @@ const defaults={engine:hasClaude?"claude":"gemini",tier:"default",keys:{},models
 let settings=Object.assign({},defaults,store.get("settings",{}));
 settings.keys=Object.assign({},settings.keys);settings.models=Object.assign({},defaults.models,settings.models);settings.gh=Object.assign({token:"",login:""},settings.gh);
 if(!hasClaude&&settings.engine==="claude")settings.engine="gemini";
+try{if(!settings.keys.oficina){const op=localStorage.getItem("of-pin");if(op)settings.keys.oficina=op}}catch(e){}
+if(!hasClaude&&settings.engine==="gemini"&&!settings.keys.gemini)settings.engine="oficina";
 let usage=store.get("usage",{day:"",calls:0,chars:0});
 const today=new Date().toISOString().slice(0,10);if(usage.day!==today)usage={day:today,calls:0,chars:0};
 let mode="build",attachments=[],picked=null,busy=null,lastErrors=[],picking=false,previewFiles=null,saveWarned=false,curFile="index.html";
@@ -316,13 +318,14 @@ let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{
 },250)}
 
 /* ---------- motores ---------- */
-const ENGINES={claude:"Claude (tu cuenta)",gemini:"Google Gemini (gratis)",openrouter:"OpenRouter (modelos gratis)",anthropic:"Anthropic (tu clave)",openai:"Otro compatible (OpenAI, Groq…)"};
+const OFICINA="https://oficina-buzon.uwuubuntu83.workers.dev";
+const ENGINES={oficina:"Oficina Bosio (todas las IA gratis, nunca se queda sin)",claude:"Claude (tu cuenta)",gemini:"Google Gemini (gratis)",openrouter:"OpenRouter (modelos gratis)",anthropic:"Anthropic (tu clave)",openai:"Otro compatible (OpenAI, Groq…)"};
 async function initClaude(){
   if(hasClaude){try{sampleFn=await window.claude.use("sample")}catch(e){sampleFn=null}
     if(sampleFn){try{sampleLimits=await sampleFn.limits()}catch(e){sampleLimits=null}}}
   claudeChecked=true;renderTop();renderComposer();renderMsgs();
 }
-function engineReady(){const e=settings.engine;if(e==="claude")return!!sampleFn||!claudeChecked;if(!WEB)return false;if(e==="openai")return!!(settings.baseUrl&&settings.models.openai);return!!(settings.keys[e]&&settings.models[e])}
+function engineReady(){const e=settings.engine;if(e==="oficina")return WEB&&!!settings.keys.oficina;if(e==="claude")return!!sampleFn||!claudeChecked;if(!WEB)return false;if(e==="openai")return!!(settings.baseUrl&&settings.models.openai);return!!(settings.keys[e]&&settings.models[e])}
 
 async function readSSE(res,onData,signal){
   const rd=res.body.getReader();const dec=new TextDecoder();let buf="";
@@ -345,6 +348,14 @@ async function callAI(turns,{onText,signal,images,quick}={}){
     const r=await sampleFn(turns,opt);return{text:r.text,truncated:r.truncated};
   }
   if(!WEB)throw{code:"no_net",message:"Dentro de Claude, Forja no puede conectarse a "+ENGINES[eng]+". Usá el motor Claude o abrí Forja en la web."};
+  if(eng==="oficina"){
+    const pin=settings.keys.oficina||"";if(!pin)throw{code:"no_key",message:"Falta tu PIN de la Oficina Bosio. Cargalo en Ajustes."};
+    const imgs0=[];for(const a of images||[])imgs0.push({mime:a.blob.type||"image/png",data:await b64(a.blob)});
+    const r=await fetch(OFICINA+"/oficina/llm",{method:"POST",signal,headers:{"content-type":"application/json","x-pin":pin},body:JSON.stringify({messages:turns,images:imgs0})});
+    if(r.status===401)throw{code:"no_key",message:"El PIN de la oficina no es correcto. Revisalo en Ajustes."};
+    const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw{code:"http",message:j.msg||j.error||("La oficina respondió "+r.status)};
+    settings.lastModel=j.modelo||"";emit(j.texto);return{text,truncated:!!j.cortado};
+  }
   const key=settings.keys[eng]||"";const model=(settings.models[eng]||"").trim();
   if(eng!=="openai"&&!key)throw{code:"no_key",message:"Falta la clave de "+ENGINES[eng]+". Cargala en Ajustes."};
   if(!model)throw{code:"no_model",message:"Falta elegir el modelo de "+ENGINES[eng]+". Elegilo en Ajustes."};
@@ -479,8 +490,15 @@ function setupCard(){
   const go=h("button",{class:"btn primary",onclick:async()=>{const k=key.value.trim();if(!k){key.focus();return}go.disabled=true;st.textContent="Probando la clave…";
     try{const ms=await listGemini(k);if(!ms.length)throw{message:"La clave funciona pero no encontré modelos disponibles."};settings.engine="gemini";settings.keys.gemini=k;settings.models.gemini=ms[0];persist();
       st.textContent="";toast("Listo: Gemini conectado ("+ms[0]+")");refreshAll()}catch(e){st.textContent=(e&&e.message)||"No funcionó la clave. Revisala.";go.disabled=false}}},"Conectar");
+  const pinI=h("input",{type:"password",inputmode:"numeric",placeholder:"Tu PIN de la Oficina Bosio",autocomplete:"off"});const stO=h("div",{class:"hint","aria-live":"polite"});
+  const goO=h("button",{class:"btn primary",onclick:async()=>{const k=pinI.value.trim();if(!k){pinI.focus();return}goO.disabled=true;stO.textContent="Conectando con la oficina…";
+    try{const r=await fetch(OFICINA+"/oficina/chat",{headers:{"x-pin":k}});if(r.status===401)throw{message:"Ese PIN no es correcto."};if(!r.ok)throw{message:"La oficina no respondió ("+r.status+")."};settings.engine="oficina";settings.keys.oficina=k;persist();stO.textContent="";toast("Listo: Forja usa todas las IA gratis de tu oficina");refreshAll()}catch(e){stO.textContent=(e&&e.message)||"No pude conectar.";goO.disabled=false}}},"Usar la oficina");
   return h("div",{class:"setup"},
-    h("h2",{},"Conectá un motor gratis (2 minutos)"),
+    h("h2",{},"Usá las IA de tu oficina (recomendado)"),
+    h("p",{class:"hint"},"Sin claves: Forja usa la rueda de IA gratis de la Oficina Bosio. Si una se queda sin cupo, salta sola a la siguiente."),
+    h("div",{class:"field"},pinI),h("div",{class:"row"},goO),stO,
+    h("hr",{style:"border:0;border-top:1px solid var(--line,#333);margin:14px 0"}),
+    h("h2",{},"O conectá un motor gratis (2 minutos)"),
     h("ol",{class:"steps"},
       h("li",{},"Abrí ",h("a",{href:"https://aistudio.google.com/apikey",target:"_blank",rel:"noopener"},"aistudio.google.com/apikey")," con tu cuenta de Google."),
       h("li",{},"Tocá ",h("b",{},"Create API key")," y copiá la clave."),
@@ -514,27 +532,55 @@ function renderComposer(){
   const canImg=settings.engine!=="claude"||(sampleLimits&&sampleLimits.images);
   const fileIn=h("input",{type:"file",accept:"image/png,image/jpeg,image/webp,image/gif",multiple:true,hidden:true,id:"imgIn",onchange:e=>{addFiles(e.target.files);e.target.value=""}});
   const imgBtn=h("button",{class:"btn",title:canImg?"Adjuntar captura o foto":"Este motor no acepta imágenes acá",disabled:!canImg,onclick:()=>fileIn.click()},"Imagen");
+  const zipIn=h("input",{type:"file",accept:".zip,application/zip",hidden:true,onchange:e=>{subirZip(e.target.files[0]);e.target.value=""}});
+  const zipBtn=h("button",{class:"btn",title:"Subí un ZIP: si es una página web la abre; si es otro código, la IA lo lee",onclick:()=>zipIn.click()},"Subir ZIP");
   const pickBtn=h("button",{class:"btn",title:"Tocá un elemento de la vista para cambiar solo eso",disabled:!hasApp(p),onclick:startPick},"Elegir elemento");
   const enhBtn=h("button",{class:"btn",title:"Convierte tu idea en un pedido detallado",disabled:!!busy,onclick:enhance},"Mejorar pedido");
   const chips=h("div",{class:"chips"});
   for(const a of attachments)chips.append(h("span",{class:"chip"},h("img",{src:a.url,alt:""}),h("span",{},a.name),h("button",{"aria-label":"Quitar imagen",onclick:()=>{attachments=attachments.filter(x=>x!==a);renderComposer()}},"✕")));
+  if(zipCtx)chips.append(h("span",{class:"chip",title:zipCtx.files.map(x=>x.name).join("\n")},h("span",{},"📦 "+zipCtx.name+" ("+zipCtx.files.length+" archivos)"),h("button",{"aria-label":"Quitar ZIP",onclick:()=>{zipCtx=null;renderComposer()}},"✕")));
   if(picked)chips.append(h("span",{class:"chip",title:picked.html},h("span",{},"Elemento: "+picked.sel),h("button",{"aria-label":"Quitar elemento",onclick:()=>{picked=null;renderComposer()}},"✕")));
   const ta=h("textarea",{id:"prompt",rows:"2",placeholder:mode==="chat"?"Preguntá o planeá sin cambiar el código…":(hasApp(p)?"Pedí un cambio: \"agregá modo oscuro\", \"el botón no anda\"…":"Describí tu app, juego o página…"),"aria-label":"Mensaje"});
   ta.addEventListener("input",autoGrow);
   ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&window.matchMedia("(pointer:fine)").matches){e.preventDefault();send()}});
   ta.addEventListener("paste",e=>{const fs=[...((e.clipboardData&&e.clipboardData.files)||[])].filter(f=>f.type.startsWith("image/"));if(fs.length&&canImg){e.preventDefault();addFiles(fs)}});
   const sendB=busy?h("button",{class:"send stop",onclick:stop},"Detener"):h("button",{class:"send",onclick:send},mode==="chat"?"Preguntar":"Enviar");
-  composerEl.append(h("div",{class:"row"},seg,imgBtn,pickBtn,enhBtn,fileIn));
+  composerEl.append(h("div",{class:"row"},seg,imgBtn,zipBtn,pickBtn,enhBtn,fileIn,zipIn));
   if(chips.childNodes.length)composerEl.append(chips);
   composerEl.append(h("div",{class:"inputwrap"},ta,sendB),h("div",{class:"hint"},usageText()));
   if(draft){ta.value=draft;autoGrow()}if(hadFocus)ta.focus();
 }
 function usageText(){const eng=settings.engine;const base="Hoy: "+usage.calls+" pedido"+(usage.calls===1?"":"s")+" · ~"+Math.round(usage.chars/4/1000)+"k tokens enviados. ";
+  if(eng==="oficina")return base+"Oficina Bosio: IA gratis en rueda"+(settings.lastModel?" (la última: "+settings.lastModel+")":"")+".";
   if(eng==="claude")return base+"Usa el límite de tu plan de Claude.";
   if(eng==="gemini")return base+"Gemini gratis: cupo diario de Google.";
   if(eng==="openrouter")return base+"OpenRouter: los modelos :free no cobran (con límite diario).";
   return base+"Pagás solo lo que cobre tu proveedor."}
 function autoGrow(){const t=$("#prompt");if(!t)return;t.style.height="auto";t.style.height=Math.min(t.scrollHeight,180)+"px"}
+let zipCtx=null;
+const ZIP_TXT=/\.(html?|css|js|mjs|cjs|ts|tsx|jsx|json|md|txt|py|sh|ya?ml|toml|ini|cfg|xml|svg|sql|php|java|kt|go|rs|c|cpp|h|cs|rb|vue|svelte|env\.example|csv)$/i;
+async function subirZip(f){
+  if(!f)return;toast("Abriendo el ZIP…");
+  try{const JSZip=await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js","JSZip");const z=await JSZip.loadAsync(f);
+    const ent=Object.values(z.files).filter(e=>!e.dir&&!/(^|\/)(node_modules|\.git|__pycache__|\.venv|venv|dist|build|\.next)\//.test(e.name)&&!/(^|\/)\.DS_Store$|__MACOSX/.test(e.name));
+    const txt=[],skip=[];for(const e of ent){if(!ZIP_TXT.test(e.name)){skip.push(e.name);continue}const c=await e.async("string");if(c.length>200000){skip.push(e.name+" (muy grande)");continue}txt.push({name:e.name,c})}
+    if(!txt.length){toast("El ZIP no tiene archivos de código o texto que pueda leer.");return}
+    const idx=txt.filter(x=>/(^|\/)index\.html?$/i.test(x.name)).sort((a,b)=>a.name.split("/").length-b.name.split("/").length)[0];
+    const nombre=(f.name||"proyecto").replace(/\.zip$/i,"");
+    if(idx){ // página web: la cargo como proyecto nuevo, lista para ver y pedir cambios
+      const root=idx.name.slice(0,idx.name.lastIndexOf("/")+1);const files={};for(const x of txt)if(x.name.startsWith(root)){const rel=x.name.slice(root.length);files[/^index\.htm$/i.test(rel)?"index.html":rel]=x.c}
+      const q=newProject(nombre);q.files=files;q.versions=[{id:uid(),ts:Date.now(),label:"Subido desde "+f.name,files:JSON.parse(JSON.stringify(files))}];
+      q.chat=[{role:"note",text:"Cargué «"+f.name+"»: "+Object.keys(files).length+" archivo(s)"+(skip.length?" ("+skip.length+" que no son código quedaron afuera: imágenes, videos, etc.)":"")+". Ya lo podés ver a la derecha. Pedile cambios: «arreglá el menú en el celu», «agregá modo oscuro»…"}];
+      projects.push(q);curId=q.id;previewFiles=null;lastErrors=[];picked=null;curFile="index.html";persist();refreshAll();setMob&&setMob("chat");toast("Proyecto «"+nombre+"» cargado");return}
+    // otro código (Python, bots, etc.): se lo paso a la IA como contexto
+    const pri=x=>(/readme|leeme|instruc/i.test(x.name)?0:/(^|\/)(main|app|index|bot|server)\./i.test(x.name)?1:/\.(json|ya?ml|toml|ini|cfg)$/i.test(x.name)?3:2);
+    txt.sort((a,b)=>pri(a)-pri(b)||a.c.length-b.c.length);
+    const LIM=110000;let tot=0;const dentro=[],fuera=[];for(const x of txt){if(tot+x.c.length<=LIM){dentro.push(x);tot+=x.c.length}else fuera.push(x.name)}
+    zipCtx={name:f.name,files:dentro,fuera:fuera.concat(skip)};
+    addMsg({role:"note",text:"📦 Leí «"+f.name+"»: la IA va a ver "+dentro.length+" archivo(s) de código"+(fuera.length?". No entraron "+fuera.length+" (las IA gratis leen hasta ~110.000 caracteres por vez): "+fuera.slice(0,8).join(", ")+(fuera.length>8?"…":""):"")+".\nAhora preguntá o pedí algo: «explicame qué hace», «buscá errores», «mejorá el archivo X»."});
+    mode="chat";renderComposer();renderMsgs();const t=$("#prompt");t&&t.focus();
+  }catch(e){toast("No pude abrir ese ZIP: "+((e&&e.message)||e))}
+}
 function addFiles(fs){for(const f of fs){if(!f.type.startsWith("image/"))continue;if(attachments.length>=4)break;attachments.push({blob:f,name:f.name||"captura",url:URL.createObjectURL(f)})}renderComposer()}
 
 /* ---------- banco de trabajo ---------- */
@@ -632,6 +678,7 @@ function send(){
   let extra="";
   if(attachments.length)extra+="Adjunto "+attachments.length+" imagen(es) de referencia: usalas para entender la pantalla o el diseño que quiere la persona.\n";
   if(picked&&kind!=="chat")extra+="La persona eligió este elemento de la vista (selector "+picked.sel+"). Limitá el cambio a ese elemento salvo que el pedido diga otra cosa:\n"+picked.html;
+  if(zipCtx)extra+="\nLA PERSONA SUBIÓ EL ZIP «"+zipCtx.name+"». ESTOS SON SUS ARCHIVOS (leelos con atención antes de responder):\n"+zipCtx.files.map(x=>"===== "+x.name+" =====\n"+x.c).join("\n\n")+(zipCtx.fuera.length?"\n(No se incluyeron por tamaño o tipo: "+zipCtx.fuera.slice(0,30).join(", ")+")":"")+"\n";
   const imgs=attachments.slice();
   addMsg({role:"user",text:req,imgs:imgs.map(a=>a.url),picked:picked?picked.sel:null});
   ta.value="";autoGrow();attachments=[];picked=null;
@@ -838,6 +885,9 @@ function openSettings(){drawer("Ajustes",(b)=>{
       const t=h("select",{id:"tier"},...[["quick","Rápido (cambios chicos)"],["default","Normal (recomendado)"],["complex","Máximo (apps grandes, tarda más)"]].map(([k,v])=>h("option",{value:k,selected:settings.tier===k},v)));
       t.addEventListener("change",()=>{settings.tier=t.value;persist()});box.append(fld("tier","Potencia",t));
     }
+    if(e==="oficina"){box.append(h("p",{class:"hint"},"Usa todas las IA gratis de tu Oficina Bosio, en rueda: si una no tiene cupo, pasa a la siguiente. Solo necesita tu PIN."),
+      fld("k-oficina","PIN de la oficina",inp("k-oficina",settings.keys.oficina,v=>settings.keys.oficina=v,"password")),
+      settings.lastModel?h("p",{class:"hint"},"Última respuesta hecha por: "+settings.lastModel):null)}
     if(e==="gemini"){box.append(h("p",{class:"hint"},"Gratis con cupo diario. Sacá la clave en ",h("a",{href:"https://aistudio.google.com/apikey",target:"_blank",rel:"noopener"},"aistudio.google.com/apikey")," → Create API key."),
       fld("k-gemini","Clave de Gemini",inp("k-gemini",settings.keys.gemini,v=>settings.keys.gemini=v,"password")),modelPicker("gemini",()=>listGemini(settings.keys.gemini),true))}
     if(e==="openrouter"){box.append(h("p",{class:"hint"},"Una sola clave para muchos modelos. Los que terminan en :free no cobran (unos 200 pedidos por día). Clave en ",h("a",{href:"https://openrouter.ai/keys",target:"_blank",rel:"noopener"},"openrouter.ai/keys"),"."),
