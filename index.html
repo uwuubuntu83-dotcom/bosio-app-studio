@@ -337,7 +337,14 @@ async function httpErr(res,eng){let t="";try{t=await res.text()}catch(e){}let m=
   return{code:"http",status:res.status,message:why+" ("+res.status+") "+String(m).slice(0,220)}}
 function b64(blob){return new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(",")[1]);r.onerror=ko;r.readAsDataURL(blob)})}
 
-async function callAI(turns,{onText,signal,images,quick}={}){
+async function callAI(turns,opt={}){
+  try{return await callAI0(turns,opt)}
+  catch(e){const eng=settings.engine;
+    if(eng!=="oficina"&&settings.keys.oficina&&WEB&&!(e&&e.code==="cancelled")){const prev=settings.engine;settings.engine="oficina";
+      try{const r=await callAI0(turns,opt);toast("Tu motor falló, lo hizo la oficina ("+(settings.lastModel||"IA gratis")+").");return r}finally{settings.engine=prev}}
+    throw e}
+}
+async function callAI0(turns,{onText,signal,images,quick}={}){
   const eng=settings.engine;let text="",truncated=false;
   const emit=d=>{if(!d)return;text+=d;onText&&onText(text)};
   usage.calls++;usage.chars+=turns.reduce((a,t)=>a+t.content.length,0);
@@ -567,8 +574,10 @@ async function subirZip(f){
     if(!txt.length){toast("El ZIP no tiene archivos de código o texto que pueda leer.");return}
     const idx=txt.filter(x=>/(^|\/)index\.html?$/i.test(x.name)).sort((a,b)=>a.name.split("/").length-b.name.split("/").length)[0];
     const nombre=(f.name||"proyecto").replace(/\.zip$/i,"");
-    if(idx){ // página web: la cargo como proyecto nuevo, lista para ver y pedir cambios
-      const root=idx.name.slice(0,idx.name.lastIndexOf("/")+1);const files={};for(const x of txt)if(x.name.startsWith(root)){const rel=x.name.slice(root.length);files[/^index\.htm$/i.test(rel)?"index.html":rel]=x.c}
+    const backend=txt.filter(x=>/\.(py|java|kt|go|rs|php|rb|cs|c|cpp|sh)$/i.test(x.name));
+    if(idx&&backend.length)toast("Tiene "+backend.length+" archivo(s) de programa (Python, etc.): no es solo una página, lo leo como código.");
+    if(idx&&!backend.length){ // página web: la cargo como proyecto nuevo, lista para ver y pedir cambios
+      const root=idx.name.slice(0,idx.name.lastIndexOf("/")+1);const files={};for(const x of txt)if(x.name.startsWith(root)){const rel=x.name.slice(root.length);let c=x.c;if(/\.html?$/i.test(rel))c=c.replace(/(src|href)=(["'])\/(?!\/)/g,"$1=$2");files[/^index\.htm$/i.test(rel)?"index.html":rel]=c}
       const q=newProject(nombre);q.files=files;q.versions=[{id:uid(),ts:Date.now(),label:"Subido desde "+f.name,files:JSON.parse(JSON.stringify(files))}];
       q.chat=[{role:"note",text:"Cargué «"+f.name+"»: "+Object.keys(files).length+" archivo(s)"+(skip.length?" ("+skip.length+" que no son código quedaron afuera: imágenes, videos, etc.)":"")+". Ya lo podés ver a la derecha. Pedile cambios: «arreglá el menú en el celu», «agregá modo oscuro»…"}];
       projects.push(q);curId=q.id;previewFiles=null;lastErrors=[];picked=null;curFile="index.html";persist();refreshAll();setMob&&setMob("chat");toast("Proyecto «"+nombre+"» cargado");return}
