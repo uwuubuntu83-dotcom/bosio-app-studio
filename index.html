@@ -1,0 +1,870 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="description" content="Forja: creá apps, juegos y webs con IA desde el navegador."><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Forja</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: chat a la izquierda (el taller), banco de trabajo a la derecha (vista, código, versiones). En celular, una pestaña por vez. */
+:root{
+  --bg:#e9edf1; --panel:#f7f9fb; --raised:#ffffff; --ink:#15202b; --muted:#5b6b7b; --line:#cdd6df;
+  --accent:#2747c9; --accent-ink:#ffffff; --ember:#d9480f; --ok:#1f7a4d; --warn:#a15c00; --bad:#b42318;
+  --user:#dfe6ff; --code-bg:#0f1720; --code-ink:#d6e2ee;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r-s:6px; --r-m:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141b; --panel:#141c25; --raised:#1a2430; --ink:#e4ebf2; --muted:#93a3b4; --line:#2a3846;
+  --accent:#7d97ff; --accent-ink:#0b1020; --ember:#ff7a45; --ok:#4cc38a; --warn:#f0b357; --bad:#ff6b5e;
+  --user:#22305a; --code-bg:#0a0f15; --code-ink:#d6e2ee; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141b; --panel:#141c25; --raised:#1a2430; --ink:#e4ebf2; --muted:#93a3b4; --line:#2a3846;
+  --accent:#7d97ff; --accent-ink:#0b1020; --ember:#ff7a45; --ok:#4cc38a; --warn:#f0b357; --bad:#ff6b5e;
+  --user:#22305a; --code-bg:#0a0f15; --code-ink:#d6e2ee; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;overflow:hidden;margin:0}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:block}
+.top{display:flex;align-items:center;gap:8px;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel);min-width:0}
+.brand{font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:-.02em;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.brand .spark{width:12px;height:12px;border-radius:2px;background:var(--ember);transform:rotate(45deg);box-shadow:0 0 0 3px color-mix(in srgb,var(--ember) 22%,transparent)}
+.proj{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
+.proj button.name{border:1px solid transparent;background:none;padding:4px 8px;border-radius:var(--r-s);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.proj button.name:hover{border-color:var(--line)}
+.engine-chip{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap;background:none}
+.engine-chip b{color:var(--ink);font-weight:600}
+.btn{border:1px solid var(--line);background:var(--raised);border-radius:var(--r-s);padding:6px 11px;font-weight:500;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.icon-btn{border:1px solid var(--line);background:var(--raised);border-radius:var(--r-s);width:34px;height:34px;display:inline-grid;place-items:center;flex:none}
+.icon-btn svg{width:17px;height:17px}
+.icon-btn[disabled]{opacity:.45}
+.main{display:grid;grid-template-columns:minmax(320px,410px) 1fr;min-height:0;position:fixed;left:0;right:0;bottom:0;top:51px}
+.chat{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:var(--panel)}
+.msgs{flex:1;overflow-y:auto;padding-block:16px 8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:100%;min-width:0;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:var(--user);padding:8px 12px;border-radius:12px 12px 2px 12px;max-width:88%;white-space:pre-wrap}
+.msg.user img{display:block;max-height:90px;border-radius:6px;margin-top:6px}
+.msg.ai{white-space:pre-wrap}
+.msg.ai .who{font-family:var(--f-display);font-weight:600;font-size:12px;color:var(--muted);margin-bottom:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.msg.note{font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding:2px 0 2px 10px;white-space:pre-wrap}
+.msg.note.bad{border-color:var(--bad);color:var(--ink)}
+.msg.note.ok{border-color:var(--ok);color:var(--ink)}
+.msg .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;white-space:normal}
+.progress{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ember);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.dot{animation:none}}
+.composer{border-top:1px solid var(--line);padding-block:10px calc(10px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px;display:flex;flex-direction:column;gap:8px;background:var(--panel)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden;flex:none}
+.seg button{border:0;background:none;padding:5px 10px;font-size:12.5px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;display:inline-flex;gap:6px;align-items:center;background:var(--raised);max-width:100%}
+.chip img{width:22px;height:22px;object-fit:cover;border-radius:4px}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.chip button{border:0;background:none;padding:0;color:var(--muted);line-height:1}
+.inputwrap{display:flex;gap:8px;align-items:flex-end;border:1px solid var(--line);border-radius:var(--r-m);background:var(--raised);padding:6px}
+.inputwrap:focus-within{border-color:var(--accent)}
+#prompt{flex:1;border:0;background:none;resize:none;min-height:44px;max-height:180px;padding:6px;outline:none;min-width:0}
+.send{background:var(--accent);color:var(--accent-ink);border:0;border-radius:var(--r-s);height:36px;padding:0 14px;font-weight:600;flex:none}
+.send.stop{background:var(--bad);color:#fff}
+.hint{font-size:11.5px;color:var(--muted)}
+.work{display:flex;flex-direction:column;min-height:0;min-width:0}
+.tabs{display:flex;align-items:center;gap:4px;padding-block:6px;padding-left:12px;padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.tab{border:0;background:none;padding:6px 12px;border-radius:var(--r-s);color:var(--muted);font-weight:500}
+.tab[aria-selected="true"]{background:var(--raised);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.tabs .spacer{flex:1}
+.pane{flex:1;min-height:0;display:flex;flex-direction:column}
+.stage{flex:1;min-height:0;display:flex;justify-content:center;align-items:stretch;padding:14px;overflow:auto;background:repeating-linear-gradient(45deg,var(--bg) 0 10px,color-mix(in srgb,var(--line) 30%,var(--bg)) 10px 11px)}
+.frame-wrap{width:100%;height:100%;max-width:100%;background:#fff;border-radius:var(--r-m);box-shadow:0 0 0 1px var(--line),0 12px 30px -18px rgba(0,0,0,.35);overflow:hidden;transition:max-width .2s;position:relative}
+.frame-wrap.m{max-width:390px}.frame-wrap.t{max-width:820px}
+iframe{border:0;width:100%;height:100%;display:block;background:#fff}
+.empty{position:absolute;inset:0;display:grid;place-items:center;background:var(--raised);color:var(--muted);text-align:center;padding:24px}
+.errbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 14px;background:color-mix(in srgb,var(--bad) 12%,var(--panel));border-bottom:1px solid var(--line);font-size:13px}
+.errbar code{font-family:var(--f-mono);font-size:12px;overflow-wrap:anywhere;min-width:0}
+.picking-banner{padding:6px 14px;background:color-mix(in srgb,var(--accent) 14%,var(--panel));font-size:13px;border-bottom:1px solid var(--line)}
+.code-area{flex:1;min-height:0;display:flex;flex-direction:column}
+.filebar{display:flex;gap:6px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);background:var(--panel);overflow-x:auto}
+.fbtn{border:1px solid var(--line);background:none;border-radius:var(--r-s);padding:4px 10px;font-family:var(--f-mono);font-size:12px;white-space:nowrap}
+.fbtn[aria-pressed="true"]{background:var(--raised);border-color:var(--accent);color:var(--ink)}
+.fbtn.add{font-family:var(--f-body)}
+#codeEd{flex:1;width:100%;border:0;resize:none;padding:14px 16px;background:var(--code-bg);color:var(--code-ink);font-family:var(--f-mono);font-size:12.5px;line-height:1.55;tab-size:2;white-space:pre;overflow:auto;outline:none}
+.codebar{display:flex;gap:8px;align-items:center;padding:8px 14px;border-top:1px solid var(--line);background:var(--panel);flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.versions{flex:1;overflow:auto;padding-block:14px;padding-left:16px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+.vlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-m);background:var(--raised);overflow:hidden}
+.vlist li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
+.vlist li:first-child{border-top:0}
+.vlist .n{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.vlist .lbl{min-width:0}
+.vlist .lbl div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vlist .lbl small{color:var(--muted);font-variant-numeric:tabular-nums}
+.vlist li.cur{background:color-mix(in srgb,var(--accent) 8%,var(--raised))}
+.badge{font-size:11px;border-radius:999px;padding:1px 8px;background:var(--accent);color:var(--accent-ink);white-space:nowrap}
+.badge.ok{background:var(--ok);color:#fff}
+.scrim{position:fixed;inset:0;background:rgba(10,15,20,.4);z-index:40}
+.drawer{position:fixed;top:0;bottom:0;right:0;width:min(460px,100%);background:var(--panel);z-index:41;border-left:1px solid var(--line);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.drawer h2{font-family:var(--f-display);font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em}
+.drawer .body{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:18px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-weight:600;font-size:13px}
+.field small{color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--line);background:var(--raised);border-radius:var(--r-s);padding:8px 10px;width:100%;min-width:0}
+.field textarea{min-height:90px;resize:vertical}
+.group{border:1px solid var(--line);border-radius:var(--r-m);padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--raised)}
+.group h3{margin:0;font-size:14px;font-family:var(--f-display);font-weight:700}
+.group p{margin:0}
+.callout{font-size:13px;border-left:3px solid var(--warn);padding:6px 10px;background:color-mix(in srgb,var(--warn) 9%,transparent)}
+.callout.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.plist{display:flex;flex-direction:column;gap:6px}
+.pitem{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:var(--r-s);padding:8px 10px;background:var(--raised);flex-wrap:wrap}
+.pitem.cur{border-color:var(--accent)}
+.pitem .t{flex:1;min-width:0}
+.pitem .t div{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pitem .t small{color:var(--muted)}
+.ideas{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.idea{text-align:left;border:1px dashed var(--line);background:none;border-radius:var(--r-s);padding:8px 10px;color:var(--ink)}
+.idea:hover{border-style:solid;border-color:var(--accent)}
+.welcome h1{font-family:var(--f-display);font-weight:800;font-size:28px;line-height:1.05;letter-spacing:-.025em;margin:4px 0 6px;text-wrap:balance}
+.welcome p{margin:0 0 6px;color:var(--muted);max-width:60ch}
+.setup{border:1px solid var(--accent);border-radius:var(--r-m);padding:14px;background:var(--raised);display:flex;flex-direction:column;gap:10px;white-space:normal}
+.setup h2{margin:0;font-family:var(--f-display);font-size:18px}
+.setup .field input{border:1px solid var(--line);border-radius:var(--r-s);padding:8px 10px;background:var(--panel)}
+.mobtabs{display:none}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;z-index:80;max-width:calc(100% - 32px)}
+.url{font-family:var(--f-mono);font-size:12.5px;overflow-wrap:anywhere;user-select:all}
+@media (max-width:860px){
+  .main{grid-template-columns:1fr}
+  .chat{border-right:0}
+  .main[data-m="chat"] .work{display:none}
+  .main:not([data-m="chat"]) .chat{display:none}
+  .mobtabs{display:flex;gap:4px;padding-block:6px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel);overflow-x:auto}
+  .tabs .tab{display:none}
+  .hide-sm{display:none}
+  .stage{padding:8px}
+  .frame-wrap.m,.frame-wrap.t{max-width:100%}
+}
+</style>
+
+<div class="app" id="app">
+  <div class="top" id="topbar">
+    <div class="brand" aria-label="Forja"><span class="spark" aria-hidden="true"></span>Forja</div>
+    <div class="proj"><button class="name" id="projBtn" title="Proyectos">Proyecto</button></div>
+    <button class="engine-chip hide-sm" id="engineChip" title="Motor de IA"></button>
+    <button class="icon-btn" id="undoBtn" title="Deshacer último cambio" aria-label="Deshacer último cambio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+    <button class="btn hide-sm" id="dlBtn">Descargar</button>
+    <button class="btn primary" id="pubBtn">Publicar</button>
+    <button class="icon-btn" id="setBtn" title="Ajustes" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+  <div class="mobtabs" role="tablist" id="mobtabs">
+    <button class="tab" data-m="chat" aria-selected="true">Chat</button>
+    <button class="tab" data-m="view" aria-selected="false">Vista</button>
+    <button class="tab" data-m="code" aria-selected="false">Código</button>
+    <button class="tab" data-m="ver" aria-selected="false">Versiones</button>
+  </div>
+</div>
+<div class="main" id="main" data-m="chat"></div>
+
+<script id="forja-app">
+(function(){
+"use strict";
+/* ---------- utilidades ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const h=(tag,attrs={},...kids)=>{const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs||{})){if(v==null||v===false)continue;if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?"":v)}for(const k of kids.flat()){if(k==null||k===false||k==="")continue;e.append(k.nodeType?k:document.createTextNode(String(k)))}return e};
+const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
+const lines=s=>s?s.split("\n").length:0;
+const fmtTime=t=>{const d=new Date(t);return d.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})};
+const store={get(k,d){try{const v=localStorage.getItem("forja:"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem("forja:"+k,JSON.stringify(v));return true}catch(e){return false}}};
+const SC="scr"+"ipt";
+const isSmall=()=>window.matchMedia("(max-width:860px)").matches;
+function toast(msg){const t=h("div",{class:"toast",role:"status"},msg);document.body.append(t);setTimeout(()=>t.remove(),2800)}
+async function copyText(s){try{await navigator.clipboard.writeText(s);toast("Copiado");return true}catch(e){toast("No pude copiar automáticamente: seleccioná el texto y copialo.");return false}}
+const utf8b64=s=>{const b=new TextEncoder().encode(s);let out="";for(let i=0;i<b.length;i+=0x8000)out+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(out)};
+const slug=s=>(s||"app").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40)||"app";
+const langOf=n=>{const e=(n.split(".").pop()||"").toLowerCase();return{html:"html",htm:"html",css:"css",js:"js",mjs:"js",json:"json",sql:"sql",md:"md",svg:"svg",txt:"text"}[e]||"text"};
+const sortFiles=fs=>Object.keys(fs).sort((a,b)=>(a==="index.html"?-1:b==="index.html"?1:a.localeCompare(b)));
+
+/* ---------- dónde corre Forja ---------- */
+const hasClaude=!!(window.claude&&typeof window.claude.use==="function");
+const WEB=!hasClaude; /* fuera de Claude: puede conectarse a internet (Gemini, OpenRouter, Supabase, GitHub) */
+
+/* ---------- reglas para el modelo ---------- */
+const RULES=`Sos Forja, un constructor experto de aplicaciones web, juegos y páginas. Construís lo que pide la persona y tiene que funcionar apenas se abre.
+
+REGLAS TÉCNICAS
+- Apps chicas o medianas: un solo archivo index.html con CSS y JS adentro. Apps grandes (más de ~400 líneas): index.html + styles.css + app.js (y otros .js si hace falta), enlazados con <link rel="stylesheet" href="styles.css"> y <script src="app.js"></${SC}>. Scripts clásicos: nada de import/export entre archivos propios.
+- Librerías externas solo con <script src> desde https://cdnjs.cloudflare.com, https://cdn.jsdelivr.net/npm/ o https://unpkg.com con versión exacta (ej. chart.js/4.4.1). Fuentes de Google Fonts con fuentes de respaldo.
+- Sin servidor propio: nada de fetch a APIs inventadas. Si necesita datos, incluí datos de ejemplo realistas. Para guardar en el dispositivo usá localStorage dentro de try/catch, con respaldo en memoria.
+- Prohibido alert(), confirm() y prompt(): hacé diálogos dentro de la página.
+- Funcional y completo: sin "TODO", sin funciones vacías, sin lorem ipsum. Contenido real en español rioplatense salvo que pidan otro idioma.
+- Responsive desde 360px, controles táctiles y de teclado, foco visible, respetar prefers-reduced-motion.
+- Juegos: canvas o DOM con requestAnimationFrame, controles táctiles en pantalla además de teclado, iniciar/pausa/reiniciar, puntaje y récord guardado.
+- Imágenes e íconos: dibujalos con SVG en línea o CSS. No uses emojis como íconos.
+- Si te pasan una captura de otra app: reproducí estructura, flujos y distribución con nombre, textos, colores y logo propios (nunca la marca original).
+
+DISEÑO
+- Paleta y tipografía elegidas para el tema concreto, como variables CSS. Una panadería no se ve como un panel financiero.
+- Evitá el look genérico de IA: degradados violeta-azul, fondo crema con acento terracota, negro con un solo verde ácido, todo en tarjetas iguales con la misma sombra, etiquetas en mayúsculas sobre cada título.
+- Jerarquía tipográfica clara, espaciado con gap, una sola animación con sentido en vez de muchas.`;
+
+const FMT_FILES=`Cada archivo va en un bloque de código con el lenguaje y el NOMBRE del archivo en la misma línea de apertura, así:
+\`\`\`html index.html
+...archivo completo...
+\`\`\``;
+const FMT_NEW=`FORMATO DE RESPUESTA
+1) Una a tres oraciones en español diciendo qué construiste.
+2) Los archivos COMPLETOS. ${FMT_FILES}
+Siempre tiene que haber un index.html. Nada después del último bloque.`;
+const FMT_EDIT=`FORMATO DE RESPUESTA PARA MODIFICAR
+1) Una a tres oraciones en español diciendo qué cambiaste.
+2) Bloques de cambio con EXACTAMENTE este formato (el nombre del archivo va después de BUSCAR):
+<<<<<<< BUSCAR index.html
+(líneas copiadas EXACTAS del archivo actual, con los mismos espacios)
+=======
+(cómo quedan esas líneas)
+>>>>>>> REEMPLAZAR
+Reglas: tocá solo lo necesario; nunca borres funciones que ya andan salvo que lo pidan; cada BUSCAR debe ser único en su archivo y lo más corto posible pero suficiente para ser único; preferí varios bloques chicos.
+Para crear un archivo nuevo o reemplazar uno entero, mandalo completo como bloque de código con su nombre. ${FMT_FILES}
+Para borrar un archivo escribí una línea: BORRAR ARCHIVO: nombre.ext
+Si el cambio afecta a más de la mitad del proyecto, mandá todos los archivos completos en vez de bloques de cambio.`;
+const FMT_CHAT=`MODO CHARLA: respondé, aconsejá o armá un plan en español claro y breve. NO escribas código ni bloques de cambio. Si conviene, terminá proponiendo el pedido concreto que la persona podría mandar en modo Construir.`;
+function dbRules(db){return`BASE DE DATOS Y USUARIOS (Supabase ya está configurado para este proyecto; usalo cuando la app necesite guardar datos compartidos, cuentas de usuario o login):
+- Cargá la librería con <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></${SC}> y creá el cliente así (el almacenamiento seguro es obligatorio):
+const __mem={};const safeStore={getItem:k=>{try{return localStorage.getItem(k)}catch(e){return k in __mem?__mem[k]:null}},setItem:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){__mem[k]=v}},removeItem:k=>{try{localStorage.removeItem(k)}catch(e){delete __mem[k]}}};
+const sb=supabase.createClient(${JSON.stringify(db.url)},${JSON.stringify(db.anon)},{auth:{storage:safeStore,persistSession:true,detectSessionInUrl:false}});
+- Login con email y contraseña: sb.auth.signUp, sb.auth.signInWithPassword, sb.auth.signOut y sb.auth.onAuthStateChange, con pantalla de ingreso/registro clara y mensajes de error entendibles.
+- Tablas con Row Level Security activado; cada fila con user_id uuid default auth.uid() references auth.users; políticas según el pedido (por defecto cada usuario ve y edita lo suyo).
+- Cada vez que crees o cambies tablas, mandá el SQL completo e idempotente (create table if not exists, alter table ... enable row level security, drop policy if exists + create policy) en un bloque \`\`\`sql supabase.sql
+- Mostrá estados de carga y errores de red con mensajes claros.`}
+
+/* ---------- ejemplo inicial ---------- */
+const SAMPLE=`<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="description" content="Forja: creá apps, juegos y webs con IA desde el navegador."><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lista del súper</title>
+<style>
+:root{--bg:#f3f6ef;--ink:#1d2a1f;--accent:#3d7a3a;--line:#cfd9c9;--muted:#617061}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+main{max-width:460px;margin:0 auto;padding:24px 16px}
+h1{font-size:26px;margin:0 0 4px}p{margin:0 0 16px;color:var(--muted)}
+form{display:flex;gap:8px}form input{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit}
+button{font:inherit;border:0;border-radius:8px;padding:10px 14px;background:var(--accent);color:#fff;cursor:pointer}
+ul{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:6px}
+li{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+li.done span{text-decoration:line-through;color:var(--muted)}li span{flex:1}
+li button{background:none;color:var(--muted);padding:2px 6px}
+.total{margin-top:12px;font-size:13px;color:var(--muted)}
+</style></head><body><main>
+<h1>Lista del súper</h1><p>Anotá lo que falta y tachalo en el chino.</p>
+<form id="f"><input id="i" placeholder="Ej: yerba, pan, leche" aria-label="Producto"><button>Agregar</button></form>
+<ul id="l"></ul><div class="total" id="t"></div>
+</main>
+<${SC}>
+let items;try{items=JSON.parse(localStorage.getItem("super")||"null")}catch(e){}
+items=items||[{n:"Yerba",d:false},{n:"Pan",d:true},{n:"Leche",d:false}];
+const save=()=>{try{localStorage.setItem("super",JSON.stringify(items))}catch(e){}};
+function render(){const l=document.getElementById("l");l.innerHTML="";items.forEach((it,ix)=>{const li=document.createElement("li");if(it.d)li.className="done";
+const c=document.createElement("input");c.type="checkbox";c.checked=it.d;c.onchange=()=>{it.d=c.checked;save();render()};
+const s=document.createElement("span");s.textContent=it.n;const b=document.createElement("button");b.textContent="Quitar";b.onclick=()=>{items.splice(ix,1);save();render()};
+li.append(c,s,b);l.append(li)});document.getElementById("t").textContent=items.filter(x=>!x.d).length+" pendientes de "+items.length}
+document.getElementById("f").onsubmit=e=>{e.preventDefault();const v=document.getElementById("i").value.trim();if(!v)return;items.push({n:v,d:false});document.getElementById("i").value="";save();render()};
+render();
+</${SC}></body></html>
+`;
+
+/* ---------- estado ---------- */
+function newProject(name){return{id:uid(),name,created:Date.now(),updated:Date.now(),notes:"",files:{},versions:[],chat:[],db:{url:"",anon:""},pub:null}}
+function migrate(p){if(!p.files){p.files=p.html?{"index.html":p.html}:{};delete p.html}
+  p.versions=(p.versions||[]).map(v=>v.files?v:{id:v.id||uid(),ts:v.ts,label:v.label,files:{"index.html":v.html||""}});
+  p.db=p.db||{url:"",anon:""};p.chat=p.chat||[];p.notes=p.notes||"";return p}
+let projects=store.get("projects",null);
+if(Array.isArray(projects)&&projects.length)projects=projects.map(migrate);
+else{
+  const p=newProject("Ejemplo: lista del súper");
+  p.files={"index.html":SAMPLE};p.versions=[{id:uid(),ts:Date.now(),label:"Ejemplo incluido con Forja",files:{"index.html":SAMPLE}}];
+  p.chat=[{role:"note",text:"Este es un proyecto de ejemplo. Pedile un cambio (\"agregá precios y un total\") o creá uno nuevo tocando el nombre de arriba."}];
+  projects=[p];
+}
+let curId=store.get("cur",projects[0].id);
+if(!projects.find(p=>p.id===curId))curId=projects[0].id;
+const defaults={engine:hasClaude?"claude":"gemini",tier:"default",keys:{},models:{gemini:"",anthropic:"claude-sonnet-5-5",openrouter:"",openai:""},baseUrl:"",gh:{token:"",login:""}};
+let settings=Object.assign({},defaults,store.get("settings",{}));
+settings.keys=Object.assign({},settings.keys);settings.models=Object.assign({},defaults.models,settings.models);settings.gh=Object.assign({token:"",login:""},settings.gh);
+if(!hasClaude&&settings.engine==="claude")settings.engine="gemini";
+let usage=store.get("usage",{day:"",calls:0,chars:0});
+const today=new Date().toISOString().slice(0,10);if(usage.day!==today)usage={day:today,calls:0,chars:0};
+let mode="build",attachments=[],picked=null,busy=null,lastErrors=[],picking=false,previewFiles=null,saveWarned=false,curFile="index.html";
+let sampleFn=null,sampleLimits=null,claudeChecked=!hasClaude;
+const cur=()=>projects.find(p=>p.id===curId);
+const entryOf=fs=>fs["index.html"]!=null?"index.html":(Object.keys(fs).find(n=>/\.html?$/i.test(n))||null);
+const hasApp=p=>!!entryOf(p.files);
+let saveT;function persist(){clearTimeout(saveT);saveT=setTimeout(()=>{
+  for(const p of projects){if(p.versions.length>30)p.versions=p.versions.slice(-30);if(p.chat.length>80)p.chat=p.chat.slice(-80)}
+  let ok=store.set("projects",projects);
+  if(!ok){for(const p of projects)if(p.versions.length>6)p.versions=p.versions.slice(-6);ok=store.set("projects",projects)}
+  if(!ok&&!saveWarned){saveWarned=true;toast("El navegador se quedó sin lugar. Exportá tus proyectos desde Proyectos.")}
+  store.set("cur",curId);store.set("settings",settings);store.set("usage",usage);
+},250)}
+
+/* ---------- motores ---------- */
+const ENGINES={claude:"Claude (tu cuenta)",gemini:"Google Gemini (gratis)",openrouter:"OpenRouter (modelos gratis)",anthropic:"Anthropic (tu clave)",openai:"Otro compatible (OpenAI, Groq…)"};
+async function initClaude(){
+  if(hasClaude){try{sampleFn=await window.claude.use("sample")}catch(e){sampleFn=null}
+    if(sampleFn){try{sampleLimits=await sampleFn.limits()}catch(e){sampleLimits=null}}}
+  claudeChecked=true;renderTop();renderComposer();renderMsgs();
+}
+function engineReady(){const e=settings.engine;if(e==="claude")return!!sampleFn||!claudeChecked;if(!WEB)return false;if(e==="openai")return!!(settings.baseUrl&&settings.models.openai);return!!(settings.keys[e]&&settings.models[e])}
+
+async function readSSE(res,onData,signal){
+  const rd=res.body.getReader();const dec=new TextDecoder();let buf="";
+  while(true){if(signal&&signal.aborted)throw{code:"cancelled"};const{value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});
+    let i;while((i=buf.indexOf("\n"))>=0){const line=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!line.startsWith("data:"))continue;const d=line.slice(5).trim();if(!d||d==="[DONE]")continue;let j;try{j=JSON.parse(d)}catch(e){continue}onData(j)}}
+}
+async function httpErr(res,eng){let t="";try{t=await res.text()}catch(e){}let m=t;try{const j=JSON.parse(t);m=(j.error&&(j.error.message||j.error))||j.message||t}catch(e){}
+  const why=res.status===401||res.status===403?"La clave no es válida o no tiene permiso.":res.status===429?"Se llegó al límite gratis de este modelo por ahora. Esperá un minuto o elegí otro modelo gratis en Ajustes.":res.status===404?"El modelo no existe con ese nombre. Elegí otro en Ajustes.":res.status===402?"Ese modelo requiere saldo. Elegí uno gratis en Ajustes.":"El proveedor respondió con un error.";
+  return{code:"http",status:res.status,message:why+" ("+res.status+") "+String(m).slice(0,220)}}
+function b64(blob){return new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(",")[1]);r.onerror=ko;r.readAsDataURL(blob)})}
+
+async function callAI(turns,{onText,signal,images,quick}={}){
+  const eng=settings.engine;let text="",truncated=false;
+  const emit=d=>{if(!d)return;text+=d;onText&&onText(text)};
+  usage.calls++;usage.chars+=turns.reduce((a,t)=>a+t.content.length,0);
+  if(eng==="claude"){
+    if(!sampleFn)throw{code:"no_engine",message:"Claude solo funciona cuando abrís Forja dentro de Claude. Elegí otro motor en Ajustes."};
+    const opt={onText:({text:t})=>{text=t;onText&&onText(t)},signal,cache:false,modelTier:quick?"quick":(settings.tier||"default")};
+    if(images&&images.length){if(!sampleLimits||!sampleLimits.images)throw{code:"images_unavailable",message:"Esta vista no permite mandar imágenes a Claude. Describí la captura con palabras."};opt.images=images.map(a=>a.blob)}
+    const r=await sampleFn(turns,opt);return{text:r.text,truncated:r.truncated};
+  }
+  if(!WEB)throw{code:"no_net",message:"Dentro de Claude, Forja no puede conectarse a "+ENGINES[eng]+". Usá el motor Claude o abrí Forja en la web."};
+  const key=settings.keys[eng]||"";const model=(settings.models[eng]||"").trim();
+  if(eng!=="openai"&&!key)throw{code:"no_key",message:"Falta la clave de "+ENGINES[eng]+". Cargala en Ajustes."};
+  if(!model)throw{code:"no_model",message:"Falta elegir el modelo de "+ENGINES[eng]+". Elegilo en Ajustes."};
+  const imgs=[];for(const a of images||[])imgs.push({mime:a.blob.type||"image/png",data:await b64(a.blob)});
+  let res;
+  try{
+    if(eng==="gemini"){
+      const contents=turns.map((t,i)=>({role:t.role==="assistant"?"model":"user",parts:[{text:t.content}].concat(i===turns.length-1?imgs.map(x=>({inline_data:{mime_type:x.mime,data:x.data}})):[])}));
+      res=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model.replace(/^models\//,""))+":streamGenerateContent?alt=sse&key="+encodeURIComponent(key),{method:"POST",signal,headers:{"content-type":"application/json"},body:JSON.stringify({contents,generationConfig:{maxOutputTokens:65536,temperature:0.6}})});
+      if(!res.ok)throw await httpErr(res,eng);
+      await readSSE(res,j=>{if(j.error)throw{code:"http",message:j.error.message||"Error de Gemini"};const c=j.candidates&&j.candidates[0];if(!c)return;for(const p of(c.content&&c.content.parts)||[])if(p.text&&!p.thought)emit(p.text);if(c.finishReason==="MAX_TOKENS")truncated=true},signal);
+    }else if(eng==="anthropic"){
+      const messages=turns.map((t,i)=>({role:t.role,content:i===turns.length-1&&imgs.length?imgs.map(x=>({type:"image",source:{type:"base64",media_type:x.mime,data:x.data}})).concat([{type:"text",text:t.content}]):t.content}));
+      res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model,max_tokens:32000,stream:true,messages})});
+      if(!res.ok)throw await httpErr(res,eng);
+      await readSSE(res,j=>{if(j.type==="content_block_delta"&&j.delta&&j.delta.type==="text_delta")emit(j.delta.text);if(j.type==="message_delta"&&j.delta&&j.delta.stop_reason==="max_tokens")truncated=true;if(j.type==="error")throw{code:"http",message:(j.error&&j.error.message)||"Error del proveedor"}},signal);
+    }else{
+      const base=eng==="openrouter"?"https://openrouter.ai/api/v1":(settings.baseUrl||"").replace(/\/+$/,"");
+      const messages=turns.map((t,i)=>({role:t.role,content:i===turns.length-1&&imgs.length?[{type:"text",text:t.content}].concat(imgs.map(x=>({type:"image_url",image_url:{url:"data:"+x.mime+";base64,"+x.data}}))):t.content}));
+      const headers={"content-type":"application/json"};if(key)headers.authorization="Bearer "+key;if(eng==="openrouter")headers["X-Title"]="Forja";
+      res=await fetch(base+"/chat/completions",{method:"POST",signal,headers,body:JSON.stringify({model,stream:true,messages})});
+      if(!res.ok)throw await httpErr(res,eng);
+      await readSSE(res,j=>{if(j.error)throw{code:"http",message:j.error.message||"Error del proveedor"};const c=j.choices&&j.choices[0];if(!c)return;if(c.delta&&c.delta.content)emit(c.delta.content);if(c.finish_reason==="length")truncated=true},signal);
+    }
+  }catch(e){
+    if(e&&e.name==="AbortError")throw{code:"cancelled",text};
+    if(e&&e.code)throw Object.assign({text},e);
+    throw{code:"network",text,message:"No se pudo conectar con "+ENGINES[eng]+". Revisá tu conexión a internet y probá de nuevo."};
+  }
+  if(!text.trim())throw{code:"empty_completion",message:"El modelo no devolvió texto. Probá de nuevo o con otro modelo."};
+  return{text,truncated};
+}
+/* listas de modelos gratis */
+async function listGemini(key){const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key="+encodeURIComponent(key));if(!r.ok)throw await httpErr(r,"gemini");const j=await r.json();
+  const ms=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")&&/gemini/.test(m.name)&&!/(embed|tts|image|live|audio|vision|aqa|learnlm|robotics)/i.test(m.name)).map(m=>m.name.replace(/^models\//,""));
+  const score=n=>{const v=parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/)||[])[1]||0);return v*10+(/flash/.test(n)&&!/lite/.test(n)?3:/pro/.test(n)?2:/lite/.test(n)?1:0)-(/(preview|exp|latest|\d{3,}$)/.test(n)?0.5:0)};
+  return ms.sort((a,b)=>score(b)-score(a))}
+async function listOpenRouterFree(){const r=await fetch("https://openrouter.ai/api/v1/models");if(!r.ok)throw await httpErr(r,"openrouter");const j=await r.json();
+  const ids=(j.data||[]).map(m=>m.id).filter(id=>/:free$/.test(id));
+  const pref=[/gpt-oss-120b/,/qwen.*coder/,/deepseek/,/kimi|moonshot/,/glm/,/llama-?4|llama-3\.3-70b/,/gemma/];
+  const rank=id=>{const i=pref.findIndex(r=>r.test(id));return i<0?99:i};
+  return ids.sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b))}
+
+/* ---------- interpretar respuestas ---------- */
+const EDIT_RE=/<<<<<<< BUSCAR[ \t]*([^\n]*)\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n?>>>>>>> REEMPLAZAR/g;
+const DEF_NAME={html:"index.html",css:"styles.css",js:"app.js",javascript:"app.js",sql:"supabase.sql",json:"data.json"};
+function parseAnswer(t){
+  const edits=[];let m;EDIT_RE.lastIndex=0;
+  while((m=EDIT_RE.exec(t)))edits.push({file:m[1].trim().replace(/^["'`]|["'`]$/g,"")||null,find:m[2],repl:m[3]});
+  const stripped=t.replace(EDIT_RE,s=>"\u0000".repeat(s.length));
+  const files=[];const fre=/```([\w+#.-]*)[ \t]*([^\n`]*)\n/g;let f;let lastEnd=0;
+  while((f=fre.exec(stripped))){
+    const lang=(f[1]||"").toLowerCase();let name=(f[2]||"").trim().replace(/^(file(name)?|archivo)\s*[:=]\s*/i,"").replace(/^["'`]|["'`]$/g,"");
+    const start=f.index+f[0].length;let end=stripped.indexOf("\n```",start-1);if(end<start-1)end=-1;
+    const content=end>=0?t.slice(start,end+1):t.slice(start);
+    if(!name){if(DEF_NAME[lang])name=DEF_NAME[lang];else if(/^\s*<(!doctype|html)/i.test(content))name="index.html";}
+    if(name&&/^[\w./-]+\.\w+$/.test(name)&&!/^(bash|sh|text|txt|plaintext)$/.test(lang))files.push({name:name.replace(/^\.\//,""),content:content.replace(/\s+$/,"")+"\n",open:end<0});
+    lastEnd=end>=0?end+4:stripped.length;fre.lastIndex=lastEnd;if(end<0)break;
+  }
+  const deletes=[...t.matchAll(/BORRAR ARCHIVO:\s*([\w./-]+)/g)].map(x=>x[1]);
+  const firsts=[t.indexOf("<<<<<<< BUSCAR"),t.search(/```[\w+#.-]*[ \t]*[^\n`]*\n/)].filter(i=>i>=0);
+  const cut=firsts.length?Math.min(...firsts):-1;
+  const expl=(cut>=0?t.slice(0,cut):t).replace(/BORRAR ARCHIVO:.*$/gm,"").trim();
+  return{expl,files,edits,deletes,open:files.some(x=>x.open)};
+}
+function progressOf(t){const fs=[...t.matchAll(/```[\w+#.-]*[ \t]*([^\n`]*)\n/g)];const ne=(t.match(/<<<<<<< BUSCAR/g)||[]).length;
+  if(fs.length){const lastF=fs[fs.length-1];return"Escribiendo "+(lastF[1].trim()||"el código")+" · "+lines(t.slice(lastF.index))+" líneas"}
+  if(ne)return"Preparando "+ne+" cambio"+(ne>1?"s":"");return"Pensando"}
+function applyEdit(code,e){
+  const i=code.indexOf(e.find);
+  if(i>=0&&e.find.length&&code.indexOf(e.find,i+1)<0)return{ok:true,code:code.slice(0,i)+e.repl+code.slice(i+e.find.length),n:Math.max(lines(e.find),lines(e.repl))};
+  const L=code.split("\n"),F=e.find.split("\n").map(s=>s.trim());while(F.length&&!F[F.length-1])F.pop();while(F.length&&!F[0])F.shift();
+  const hits=[];if(F.length)for(let a=0;a+F.length<=L.length;a++){let ok=true;for(let b=0;b<F.length;b++)if(L[a+b].trim()!==F[b]){ok=false;break}if(ok)hits.push(a)}
+  if(hits.length===1){const a=hits[0];const ind=(L[a].match(/^\s*/)||[""])[0];const rl=e.repl.split("\n");const base=((rl.find(x=>x.trim())||"").match(/^\s*/)||[""])[0];
+    const fixed=rl.map(x=>x.startsWith(base)?ind+x.slice(base.length):x);L.splice(a,F.length,...fixed);return{ok:true,code:L.join("\n"),n:Math.max(F.length,rl.length)}}
+  return{ok:false,reason:hits.length>1?"aparece más de una vez":"no coincide con el código actual"};
+}
+
+/* ---------- unir archivos para la vista previa ---------- */
+function assemble(fs){
+  const entry=entryOf(fs);if(!entry)return"";let html=fs[entry];
+  const norm=s=>s.replace(/^\.\//,"").split(/[?#]/)[0];
+  html=html.replace(/<link\b[^>]*>/gi,tag=>{const hm=tag.match(/href\s*=\s*["']([^"']+)["']/i);if(!hm||!/stylesheet/i.test(tag))return tag;const n=norm(hm[1]);return fs[n]!=null?"<style>/* "+n+" */\n"+fs[n]+"\n</style>":tag});
+  html=html.replace(/<script\b([^>]*)\bsrc\s*=\s*["']([^"']+)["']([^>]*)>\s*<\/script>/gi,(all,a,src,b)=>{const n=norm(src);if(fs[n]==null)return all;return"<"+SC+a+b+">/* "+n+" */\n"+fs[n].replace(/<\/script/gi,"<\\/script")+"\n</"+SC+">"});
+  return html;
+}
+const PREVIEW_HEAD=`<${SC}>(function(){var P=parent;function s(m){try{P.postMessage({forja:"err",msg:String(m).slice(0,400)},"*")}catch(e){}}
+window.addEventListener("error",function(e){if(e&&e.target&&e.target!==window&&(e.target.src||e.target.href)){s("No se pudo cargar: "+(e.target.src||e.target.href));return}s((e.message||"Error")+(e.lineno?" (línea "+e.lineno+")":""))},true);
+window.addEventListener("unhandledrejection",function(e){s("Promesa rechazada: "+(e.reason&&e.reason.message||e.reason))});
+var ce=console.error;console.error=function(){s(Array.prototype.join.call(arguments," "));return ce.apply(console,arguments)};
+window.alert=function(m){console.log("[alert]",m)};window.confirm=function(){return true};window.prompt=function(m,d){return d||""};
+var pick=false,hl=null;function sel(el){var p=[];while(el&&el.nodeType===1&&p.length<5){var s=el.tagName.toLowerCase();if(el.id){p.unshift(s+"#"+el.id);break}if(el.classList.length)s+="."+Array.prototype.slice.call(el.classList,0,2).join(".");p.unshift(s);el=el.parentElement}return p.join(" > ")}
+function mk(){if(!hl){hl=document.createElement("div");hl.style.cssText="position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #2747c9;background:rgba(39,71,201,.12);border-radius:3px"}return hl}
+document.addEventListener("mouseover",function(e){if(!pick)return;var r=e.target.getBoundingClientRect(),d=mk();if(!d.parentNode)document.body.appendChild(d);d.style.left=r.left+"px";d.style.top=r.top+"px";d.style.width=r.width+"px";d.style.height=r.height+"px"},true);
+document.addEventListener("click",function(e){if(!pick)return;e.preventDefault();e.stopPropagation();var t=e.target;pick=false;if(hl&&hl.parentNode)hl.parentNode.removeChild(hl);
+P.postMessage({forja:"pick",sel:sel(t),html:t.outerHTML.slice(0,1500),text:(t.innerText||"").slice(0,120)},"*")},true);
+window.addEventListener("message",function(e){if(e.data&&e.data.forja==="pick"){pick=!!e.data.on;if(!pick&&hl&&hl.parentNode)hl.parentNode.removeChild(hl)}});})();<\/${SC}>`;
+function withHooks(html){if(/<head[^>]*>/i.test(html))return html.replace(/<head[^>]*>/i,m=>m+PREVIEW_HEAD);return PREVIEW_HEAD+html}
+
+/* ---------- interfaz ---------- */
+const main=$("#main");
+function layoutTop(){const t=$("#app").getBoundingClientRect();main.style.top=Math.round(t.bottom)+"px"}
+const chatEl=h("section",{class:"chat","aria-label":"Chat"});
+const msgsEl=h("div",{class:"msgs",id:"msgs","aria-live":"polite"});
+const composerEl=h("div",{class:"composer"});
+chatEl.append(msgsEl,composerEl);
+const workEl=h("section",{class:"work","aria-label":"Banco de trabajo"});
+main.append(chatEl,workEl);
+let wtab="view",device="";
+
+function renderTop(){
+  const p=cur();$("#projBtn").textContent=p.name;
+  const eng=settings.engine;const ready=engineReady();
+  const chip=$("#engineChip");chip.innerHTML="";chip.append("Motor: ",h("b",{},ENGINES[eng].replace(/ \(.*\)/,"")),ready?"":" · sin configurar");
+  $("#undoBtn").disabled=p.versions.length<2;
+}
+function setMob(m){main.dataset.m=m;for(const b of document.querySelectorAll("#mobtabs .tab"))b.setAttribute("aria-selected",String(b.dataset.m===m));if(m!=="chat"){wtab=m;renderWork()}}
+document.querySelectorAll("#mobtabs .tab").forEach(b=>b.addEventListener("click",()=>setMob(b.dataset.m)));
+
+function renderMsgs(){
+  const p=cur();msgsEl.innerHTML="";
+  if(claudeChecked&&!engineReady())msgsEl.append(setupCard());
+  if(!p.chat.length&&!hasApp(p))msgsEl.append(welcome());
+  for(const m of p.chat)msgsEl.append(msgNode(m));
+  if(busy)msgsEl.append(busy.node);
+  msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+function setupCard(){
+  if(!WEB)return h("div",{class:"setup"},h("h2",{},"Claude no está disponible acá"),h("p",{},"Abrí Forja dentro de Claude o en la web y elegí un motor gratis en Ajustes."));
+  const key=h("input",{id:"quickKey",type:"password",placeholder:"Pegá acá la clave (empieza con AIza…)",autocomplete:"off"});
+  const st=h("div",{class:"hint"});
+  const go=h("button",{class:"btn primary",onclick:async()=>{const k=key.value.trim();if(!k){key.focus();return}go.disabled=true;st.textContent="Probando la clave…";
+    try{const ms=await listGemini(k);if(!ms.length)throw{message:"La clave funciona pero no encontré modelos disponibles."};settings.engine="gemini";settings.keys.gemini=k;settings.models.gemini=ms[0];persist();
+      st.textContent="";toast("Listo: Gemini conectado ("+ms[0]+")");refreshAll()}catch(e){st.textContent=(e&&e.message)||"No funcionó la clave. Revisala.";go.disabled=false}}},"Conectar");
+  return h("div",{class:"setup"},
+    h("h2",{},"Conectá un motor gratis (2 minutos)"),
+    h("ol",{class:"steps"},
+      h("li",{},"Abrí ",h("a",{href:"https://aistudio.google.com/apikey",target:"_blank",rel:"noopener"},"aistudio.google.com/apikey")," con tu cuenta de Google."),
+      h("li",{},"Tocá ",h("b",{},"Create API key")," y copiá la clave."),
+      h("li",{},"Pegala acá abajo y tocá Conectar.")),
+    h("div",{class:"field"},key),h("div",{class:"row"},go,h("button",{class:"btn",onclick:openSettings},"Usar otro motor")),st,
+    h("div",{class:"hint"},"Es gratis con un cupo diario de Google. La clave queda guardada solo en este navegador."));
+}
+function welcome(){
+  const ideas=["Un juego tipo Snake con controles táctiles, niveles y récord","Una agenda de turnos para un consultorio con calendario semanal y alta de pacientes","Una página para una panadería de barrio con menú, precios y botón de pedido por WhatsApp","Un control de gastos mensual con categorías, gráfico de torta y exportar a CSV","Una app de tareas para mi equipo con login y datos compartidos (necesita base de datos)"];
+  return h("div",{class:"welcome"},
+    h("h1",{},"¿Qué construimos?"),
+    h("p",{},"Contale a Forja la app, el juego o la web que querés. También podés subir una captura de una app para que arme una parecida con tu propia marca."),
+    h("div",{class:"ideas"},ideas.map(t=>h("button",{class:"idea",onclick:()=>{const ta=$("#prompt");ta.value=t;ta.focus();autoGrow()}},t))));
+}
+function msgNode(m){
+  if(m.role==="user"){const n=h("div",{class:"msg user"},m.text);if(m.imgs)for(const s of m.imgs){const im=h("img",{src:s,alt:"Imagen adjunta"});im.onerror=()=>im.replaceWith(h("div",{class:"hint"},"(imagen adjunta)"));n.append(im)}if(m.picked)n.append(h("div",{class:"hint"},"Elemento: "+m.picked));return n}
+  if(m.role==="ai"){const n=h("div",{class:"msg ai"},h("div",{class:"who"},"Forja",m.tag?h("span",{class:"chip"},m.tag):null),m.text||"");
+    if(m.acts&&m.acts.length){const a=h("div",{class:"acts"});for(const act of m.acts)a.append(actBtn(act));n.append(a)}return n}
+  const n=h("div",{class:"msg note "+(m.kind||"")},m.text);if(m.acts&&m.acts.length){const a=h("div",{class:"acts"});for(const act of m.acts)a.append(actBtn(act));n.append(a)}return n;
+}
+function actBtn(act){if(act.type==="link")return h("a",{class:"btn",href:act.href,target:"_blank",rel:"noopener"},act.label);return h("button",{class:"btn"+(act.primary?" primary":""),onclick:()=>doAct(act)},act.label)}
+function addMsg(m){cur().chat.push(m);cur().updated=Date.now();persist();renderMsgs()}
+
+function renderComposer(){
+  const prevTa=$("#prompt");const draft=prevTa?prevTa.value:"";const hadFocus=prevTa&&document.activeElement===prevTa;
+  composerEl.innerHTML="";
+  const p=cur();
+  const seg=h("div",{class:"seg",role:"group","aria-label":"Modo"},
+    h("button",{"aria-pressed":String(mode==="build"),onclick:()=>{mode="build";renderComposer()},title:"Crea o modifica la app"},"Construir"),
+    h("button",{"aria-pressed":String(mode==="chat"),onclick:()=>{mode="chat";renderComposer()},title:"Consultar o planear sin tocar el código"},"Charlar"));
+  const canImg=settings.engine!=="claude"||(sampleLimits&&sampleLimits.images);
+  const fileIn=h("input",{type:"file",accept:"image/png,image/jpeg,image/webp,image/gif",multiple:true,hidden:true,id:"imgIn",onchange:e=>{addFiles(e.target.files);e.target.value=""}});
+  const imgBtn=h("button",{class:"btn",title:canImg?"Adjuntar captura o foto":"Este motor no acepta imágenes acá",disabled:!canImg,onclick:()=>fileIn.click()},"Imagen");
+  const pickBtn=h("button",{class:"btn",title:"Tocá un elemento de la vista para cambiar solo eso",disabled:!hasApp(p),onclick:startPick},"Elegir elemento");
+  const enhBtn=h("button",{class:"btn",title:"Convierte tu idea en un pedido detallado",disabled:!!busy,onclick:enhance},"Mejorar pedido");
+  const chips=h("div",{class:"chips"});
+  for(const a of attachments)chips.append(h("span",{class:"chip"},h("img",{src:a.url,alt:""}),h("span",{},a.name),h("button",{"aria-label":"Quitar imagen",onclick:()=>{attachments=attachments.filter(x=>x!==a);renderComposer()}},"✕")));
+  if(picked)chips.append(h("span",{class:"chip",title:picked.html},h("span",{},"Elemento: "+picked.sel),h("button",{"aria-label":"Quitar elemento",onclick:()=>{picked=null;renderComposer()}},"✕")));
+  const ta=h("textarea",{id:"prompt",rows:"2",placeholder:mode==="chat"?"Preguntá o planeá sin cambiar el código…":(hasApp(p)?"Pedí un cambio: \"agregá modo oscuro\", \"el botón no anda\"…":"Describí tu app, juego o página…"),"aria-label":"Mensaje"});
+  ta.addEventListener("input",autoGrow);
+  ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&window.matchMedia("(pointer:fine)").matches){e.preventDefault();send()}});
+  ta.addEventListener("paste",e=>{const fs=[...((e.clipboardData&&e.clipboardData.files)||[])].filter(f=>f.type.startsWith("image/"));if(fs.length&&canImg){e.preventDefault();addFiles(fs)}});
+  const sendB=busy?h("button",{class:"send stop",onclick:stop},"Detener"):h("button",{class:"send",onclick:send},mode==="chat"?"Preguntar":"Enviar");
+  composerEl.append(h("div",{class:"row"},seg,imgBtn,pickBtn,enhBtn,fileIn));
+  if(chips.childNodes.length)composerEl.append(chips);
+  composerEl.append(h("div",{class:"inputwrap"},ta,sendB),h("div",{class:"hint"},usageText()));
+  if(draft){ta.value=draft;autoGrow()}if(hadFocus)ta.focus();
+}
+function usageText(){const eng=settings.engine;const base="Hoy: "+usage.calls+" pedido"+(usage.calls===1?"":"s")+" · ~"+Math.round(usage.chars/4/1000)+"k tokens enviados. ";
+  if(eng==="claude")return base+"Usa el límite de tu plan de Claude.";
+  if(eng==="gemini")return base+"Gemini gratis: cupo diario de Google.";
+  if(eng==="openrouter")return base+"OpenRouter: los modelos :free no cobran (con límite diario).";
+  return base+"Pagás solo lo que cobre tu proveedor."}
+function autoGrow(){const t=$("#prompt");if(!t)return;t.style.height="auto";t.style.height=Math.min(t.scrollHeight,180)+"px"}
+function addFiles(fs){for(const f of fs){if(!f.type.startsWith("image/"))continue;if(attachments.length>=4)break;attachments.push({blob:f,name:f.name||"captura",url:URL.createObjectURL(f)})}renderComposer()}
+
+/* ---------- banco de trabajo ---------- */
+function renderWork(){
+  workEl.innerHTML="";const p=cur();
+  const tabs=h("div",{class:"tabs",role:"tablist"},
+    ...[["view","Vista"],["code","Código"],["ver","Versiones ("+p.versions.length+")"]].map(([k,l])=>h("button",{class:"tab",role:"tab","aria-selected":String(wtab===k),onclick:()=>{wtab=k;renderWork()}},l)),
+    h("span",{class:"spacer"}),
+    wtab==="view"?h("div",{class:"seg",role:"group","aria-label":"Tamaño de la vista"},...[["m","Celular"],["t","Tablet"],["","Completo"]].map(([k,l])=>h("button",{"aria-pressed":String(device===k),onclick:()=>{device=k;renderWork()}},l))):null,
+    wtab==="view"?h("button",{class:"btn",onclick:()=>loadPreview(true),title:"Volver a cargar la vista"},"Recargar"):null,
+    h("button",{class:"btn",onclick:openFull,disabled:!hasApp(p),title:"Ver la app a pantalla completa"},"Pantalla completa"));
+  workEl.append(tabs);
+  if(wtab==="view")workEl.append(viewPane());else if(wtab==="code")workEl.append(codePane());else workEl.append(verPane());
+}
+let frame=null;
+function errBar(){return h("div",{class:"errbar",role:"alert"},h("b",{},lastErrors.length+(lastErrors.length===1?" error":" errores")+" en la app:"),h("code",{},lastErrors[lastErrors.length-1]),
+  h("button",{class:"btn primary",onclick:fixErrors,disabled:!!busy},"Arreglar"),h("button",{class:"btn",onclick:()=>{lastErrors=[];const b=workEl.querySelector(".errbar");b&&b.remove()}},"Ignorar"))}
+function viewPane(){
+  const p=cur();const pane=h("div",{class:"pane"});
+  if(lastErrors.length)pane.append(errBar());
+  if(previewFiles)pane.append(h("div",{class:"picking-banner"},"Estás viendo una versión anterior. ",h("button",{class:"btn",onclick:()=>{previewFiles=null;renderWork()}},"Volver a la actual")));
+  if(picking)pane.append(h("div",{class:"picking-banner"},"Tocá el elemento de la vista que querés cambiar. ",h("button",{class:"btn",onclick:()=>{picking=false;post({forja:"pick",on:false});renderWork()}},"Cancelar")));
+  const wrap=h("div",{class:"frame-wrap "+device});
+  frame=h("iframe",{title:"Vista previa de la app",sandbox:"allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-pointer-lock allow-downloads"});
+  wrap.append(frame);
+  if(!hasApp(p)&&!previewFiles)wrap.append(h("div",{class:"empty"},h("div",{},h("div",{style:"font-family:var(--f-display);font-size:20px;font-weight:700;color:var(--ink);margin-bottom:4px"},"Todavía no hay nada acá"),"Escribí en el chat qué querés construir y la app aparece en esta vista.")));
+  pane.append(h("div",{class:"stage"},wrap));
+  queueMicrotask(()=>loadPreview(false));
+  return pane;
+}
+function loadPreview(force){if(!frame)return;const fs=previewFiles||cur().files;const html=assemble(fs);if(!html){frame.srcdoc="";return}if(force){lastErrors=[];const b=workEl.querySelector(".errbar");b&&b.remove()}frame.srcdoc=withHooks(html);if(picking)frame.addEventListener("load",()=>post({forja:"pick",on:true}),{once:true})}
+function post(m){try{frame&&frame.contentWindow&&frame.contentWindow.postMessage(m,"*")}catch(e){}}
+window.addEventListener("message",e=>{if(!frame||e.source!==frame.contentWindow||!e.data||!e.data.forja)return;
+  if(e.data.forja==="err"){if(lastErrors.length<20&&!lastErrors.includes(e.data.msg)){lastErrors.push(e.data.msg);const pane=workEl.querySelector(".pane");if(pane){const old=pane.querySelector(".errbar");const nb=errBar();if(old)old.replaceWith(nb);else pane.prepend(nb)}}}
+  if(e.data.forja==="pick"){picking=false;picked={sel:e.data.sel,html:e.data.html,text:e.data.text};renderComposer();const bn=workEl.querySelector(".picking-banner");bn&&bn.remove();if(isSmall())setMob("chat");const t=$("#prompt");t&&t.focus()}});
+function startPick(){if(!hasApp(cur()))return;picking=true;wtab="view";if(isSmall())setMob("view");else renderWork();setTimeout(()=>post({forja:"pick",on:true}),80)}
+function openFull(){const p=cur();if(!hasApp(p))return;const ov=h("div",{style:"position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)"});
+  const f=h("iframe",{title:"App a pantalla completa",sandbox:"allow-scripts allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-pointer-lock",style:"flex:1"});f.srcdoc=withHooks(assemble(p.files));
+  const close=()=>{ov.remove();document.removeEventListener("keydown",esc)};const esc=e=>{if(e.key==="Escape")close()};document.addEventListener("keydown",esc);
+  ov.append(h("div",{style:"display:flex;justify-content:flex-end;padding-block:8px;padding-left:16px;padding-right:max(16px,env(safe-area-inset-right,0px))"},h("button",{class:"btn",onclick:close},"Cerrar")),f);document.body.append(ov)}
+
+function codePane(){
+  const p=cur();const pane=h("div",{class:"code-area"});const names=sortFiles(p.files);
+  if(!names.length){pane.append(h("div",{class:"versions"},h("p",{class:"hint"},"Todavía no hay código. Pedí tu app en el chat.")));return pane}
+  if(p.files[curFile]==null)curFile=names[0];
+  const bar=h("div",{class:"filebar"},...names.map(n=>h("button",{class:"fbtn","aria-pressed":String(n===curFile),onclick:()=>{if(n===curFile)return;if(dirty&&!warned){warned=true;toast("Tenés cambios sin guardar. Tocá de nuevo para descartarlos.");return}curFile=n;renderWork()}},n)));
+  let warned=false;
+  const newIn=h("input",{placeholder:"nuevo.js",style:"width:110px;border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:var(--raised)","aria-label":"Nombre del archivo nuevo"});
+  bar.append(h("span",{style:"display:inline-flex;gap:4px;align-items:center"},newIn,h("button",{class:"fbtn add",onclick:()=>{const n=newIn.value.trim().replace(/^\.\//,"");if(!/^[\w./-]+\.\w+$/.test(n)){toast("Escribí un nombre como estilos.css o juego.js");return}if(p.files[n]!=null){toast("Ese archivo ya existe");return}const fs=Object.assign({},p.files,{[n]:""});commit(fs,"Archivo nuevo: "+n);curFile=n;renderWork()}},"+ Archivo")));
+  const ta=h("textarea",{id:"codeEd",spellcheck:"false","aria-label":"Código de "+curFile});ta.value=p.files[curFile]||"";
+  let dirty=false;
+  ta.addEventListener("keydown",e=>{if(e.key==="Tab"){e.preventDefault();const s=ta.selectionStart;ta.setRangeText("  ",s,ta.selectionEnd,"end");ta.dispatchEvent(new Event("input"))}});
+  const info=h("span",{},curFile+" · "+lines(p.files[curFile])+" líneas");
+  const saveB=h("button",{class:"btn primary",disabled:true,onclick:()=>{const fs=Object.assign({},p.files,{[curFile]:ta.value});dirty=false;commit(fs,"Edición manual de "+curFile);toast("Guardado como nueva versión")}},"Guardar cambios");
+  ta.addEventListener("input",()=>{dirty=true;info.textContent=curFile+" · sin guardar";saveB.disabled=false});
+  let armed=false;const delB=curFile==="index.html"?null:h("button",{class:"btn danger",onclick:()=>{if(!armed){armed=true;delB.textContent="¿Borrar "+curFile+"?";setTimeout(()=>{armed=false;delB.textContent="Borrar archivo"},3000);return}const fs=Object.assign({},p.files);delete fs[curFile];commit(fs,"Borrado: "+curFile);curFile="index.html";renderWork()}},"Borrar archivo");
+  pane.append(bar,ta,h("div",{class:"codebar"},saveB,h("button",{class:"btn",onclick:()=>copyText(ta.value)},"Copiar"),h("button",{class:"btn",onclick:downloadMain},"Descargar"),names.length>1?h("button",{class:"btn",onclick:downloadSingle},"HTML único"):null,delB,info));
+  return pane;
+}
+function verPane(){
+  const p=cur();const pane=h("div",{class:"versions"});
+  if(!p.versions.length){pane.append(h("p",{class:"hint"},"Cada cambio que haga Forja o que guardes a mano queda acá. Podés volver a cualquier versión con un toque."));return pane}
+  const ul=h("ul",{class:"vlist"});const vs=p.versions.slice().reverse();
+  vs.forEach((v,i)=>{const n=p.versions.length-i;const isCur=i===0;const nl=Object.values(v.files).reduce((a,s)=>a+lines(s),0);const nf=Object.keys(v.files).length;
+    ul.append(h("li",{class:isCur?"cur":""},h("span",{class:"n"},"v"+n),h("div",{class:"lbl"},h("div",{title:v.label},v.label),h("small",{},fmtTime(v.ts)+" · "+nf+" archivo"+(nf>1?"s":"")+" · "+nl+" líneas")),
+      isCur?h("span",{class:"badge"},"Actual"):h("div",{class:"row"},h("button",{class:"btn",onclick:()=>{previewFiles=v.files;wtab="view";if(isSmall())setMob("view");else renderWork();toast("Mostrando v"+n+". Restaurala si te gusta.")}},"Ver"),h("button",{class:"btn",onclick:()=>{commit(Object.assign({},v.files),"Restaurada v"+n);toast("Volviste a la v"+n)}},"Restaurar"))))});
+  pane.append(ul);return pane;
+}
+function commit(files,label){const p=cur();p.files=files;p.versions.push({id:uid(),ts:Date.now(),label:String(label).slice(0,140),files:Object.assign({},files)});p.updated=Date.now();previewFiles=null;lastErrors=[];persist();renderTop();renderWork();renderComposer()}
+$("#undoBtn").addEventListener("click",()=>{const p=cur();if(p.versions.length<2)return;const prev=p.versions[p.versions.length-2];commit(Object.assign({},prev.files),"Deshacer: volver a la versión anterior");addMsg({role:"note",text:"Deshiciste el último cambio."})});
+
+/* ---------- enviar ---------- */
+function historyText(p){const rec=p.chat.filter(m=>m.role==="user"||m.role==="ai").slice(-8);if(!rec.length)return"";
+  return"CONVERSACIÓN RECIENTE (para contexto):\n"+rec.map(m=>(m.role==="user"?"Persona: ":"Forja: ")+String(m.text).slice(0,600)).join("\n")+"\n\n"}
+function filesText(fs){return sortFiles(fs).map(n=>"```"+langOf(n)+" "+n+"\n"+fs[n]+(fs[n].endsWith("\n")?"":"\n")+"```").join("\n\n")}
+function buildInput(p,req,kind,extra){
+  let s=RULES+"\n\n";
+  if(p.db&&p.db.url&&p.db.anon)s+=dbRules(p.db)+"\n\n";
+  if(p.notes.trim())s+="MEMORIA DEL PROYECTO (respetala siempre):\n"+p.notes.trim()+"\n\n";
+  s+=historyText(p);
+  const has=hasApp(p);
+  if(kind==="chat"){s+=FMT_CHAT+"\n\n";if(has)s+="ARCHIVOS ACTUALES (solo para que los entiendas):\n"+filesText(p.files)+"\n\n"}
+  else if(kind==="edit"){s+=FMT_EDIT+"\n\nARCHIVOS ACTUALES DEL PROYECTO:\n"+filesText(p.files)+"\n\n"}
+  else if(kind==="rewrite"){s+=FMT_NEW+"\n\nARCHIVOS ACTUALES (reescribilos completos aplicando el pedido, sin perder lo que ya funciona):\n"+filesText(p.files)+"\n\n"}
+  else s+=FMT_NEW+"\n\n";
+  if(extra)s+=extra+"\n\n";
+  return s+"PEDIDO:\n"+req;
+}
+function send(){
+  if(busy)return;const ta=$("#prompt");const text=(ta.value||"").trim();
+  if(!text&&!attachments.length){ta.focus();return}
+  if(!engineReady()){toast("Primero conectá un motor de IA.");renderMsgs();if(isSmall())setMob("chat");return}
+  const p=cur();const req=text||"Construí una app como la de la imagen, con nombre y estilo propios.";
+  const kind=mode==="chat"?"chat":(hasApp(p)?"edit":"new");
+  let extra="";
+  if(attachments.length)extra+="Adjunto "+attachments.length+" imagen(es) de referencia: usalas para entender la pantalla o el diseño que quiere la persona.\n";
+  if(picked&&kind!=="chat")extra+="La persona eligió este elemento de la vista (selector "+picked.sel+"). Limitá el cambio a ese elemento salvo que el pedido diga otra cosa:\n"+picked.html;
+  const imgs=attachments.slice();
+  addMsg({role:"user",text:req,imgs:imgs.map(a=>a.url),picked:picked?picked.sel:null});
+  ta.value="";autoGrow();attachments=[];picked=null;
+  run({kind,req,extra,imgs});
+}
+async function enhance(){
+  const ta=$("#prompt");const t=(ta.value||"").trim();if(!t){toast("Escribí primero una idea, aunque sea corta.");ta.focus();return}
+  if(!engineReady()){toast("Primero conectá un motor de IA.");return}
+  const b=composerEl.querySelector('button[title^="Convierte"]');if(b){b.disabled=true;b.textContent="Mejorando…"}
+  try{const r=await callAI([{role:"user",content:"Convertí esta idea en un pedido claro y completo para construir una app web. Incluí: para quién es, pantallas, funciones concretas, qué datos guarda y el estilo visual adecuado. Máximo 130 palabras, en español rioplatense, en un solo párrafo o lista corta. Respondé SOLO con el pedido, sin introducción.\n\nIdea: "+t}],{quick:true});
+    ta.value=r.text.trim().replace(/^["“]|["”]$/g,"");autoGrow();toast("Pedido mejorado. Revisalo y tocá Enviar.")}
+  catch(e){toast(errText(e))}finally{renderComposer()}
+}
+function fixErrors(){if(busy||!lastErrors.length)return;const errs=lastErrors.slice(-6);addMsg({role:"user",text:"Arreglá estos errores de la app:\n"+errs.map(e=>"• "+e).join("\n")});lastErrors=[];
+  run({kind:"edit",req:"La app muestra estos errores. Encontrá la causa y arreglala sin romper nada más:\n"+errs.join("\n"),extra:"",imgs:[]})}
+function doAct(act){
+  if(act.type==="sql"){copyText(cur().files["supabase.sql"]||"");return}
+  if(busy)return;
+  if(act.type==="rewrite"){addMsg({role:"user",text:"Rehacé los archivos completos aplicando: "+act.req});run({kind:"rewrite",req:act.req,extra:"",imgs:[]})}
+  if(act.type==="continue"){addMsg({role:"user",text:"Seguí desde donde se cortó."});run({kind:act.kind||"new",req:act.req,extra:"",imgs:[],resume:act.partial})}
+}
+function stop(){if(busy&&busy.ctl)busy.ctl.abort()}
+const CONT="Se cortó tu respuesta. Seguí EXACTAMENTE desde el último carácter que escribiste, sin repetir nada y sin explicar: solo la continuación hasta cerrar el bloque de código.";
+
+async function run({kind,req,extra,imgs,resume}){
+  const p=cur();const ctl=new AbortController();
+  const bodyEl=h("div",{},"Pensando…");const prog=h("div",{class:"progress"},h("span",{class:"dot"}),h("span",{},kind==="chat"?"Pensando la respuesta":"Pensando"));
+  const node=h("div",{class:"msg ai"},h("div",{class:"who"},"Forja"),bodyEl,prog);
+  busy={ctl,node};renderMsgs();renderComposer();
+  const input=buildInput(p,req,kind,extra);
+  let turns=resume?[{role:"user",content:input},{role:"assistant",content:resume},{role:"user",content:CONT}]:[{role:"user",content:input}];
+  const show=full=>{if(kind==="chat"){bodyEl.textContent=full;return}const s=parseAnswer(full);bodyEl.textContent=s.expl||"…";prog.lastChild.textContent=progressOf(full);msgsEl.scrollTop=msgsEl.scrollHeight};
+  let acc=resume||"";
+  try{
+    let r=await callAI(turns,{onText:t=>show((resume||"")+t),signal:ctl.signal,images:imgs});
+    acc=(resume||"")+r.text;
+    let tries=0;
+    while(r.truncated&&kind!=="chat"&&tries<2&&parseAnswer(acc).open){
+      tries++;prog.lastChild.textContent="La respuesta era larga, sigo escribiendo…";
+      const base=acc;turns=[{role:"user",content:input},{role:"assistant",content:base},{role:"user",content:CONT}];
+      r=await callAI(turns,{onText:t=>show(base+t),signal:ctl.signal,images:[]});acc=base+r.text;
+    }
+    busy=null;finish(kind,req,acc,r.truncated);
+  }catch(e){
+    busy=null;
+    if(e&&e.code==="cancelled")addMsg({role:"note",text:"Detuviste el pedido. No se cambió nada."});
+    else addMsg({role:"note",kind:"bad",text:errText(e),acts:(e&&(e.status===429||e.status===404||e.status===402))?[{type:"settings",label:"Elegir otro modelo"}]:null});
+  }
+  renderMsgs();renderComposer();renderTop();persist();
+}
+function errText(e){const c=e&&e.code;const map={not_granted:"No le diste permiso a esta página para usar Claude. Volvé a intentarlo y aceptá el permiso, o elegí otro motor en Ajustes.",sampling_disabled:"Claude no está habilitado para tu cuenta en esta vista. Elegí otro motor en Ajustes.",rate_limited:"Llegaste al límite de uso por ahora. Esperá un rato o pasá a un motor gratis en Ajustes.",session_expired:"Tu sesión de Claude venció. Volvé a iniciar sesión y reintentá.",prompt_too_large:"El proyecto es demasiado grande para mandarlo entero. Pedí cambios más chicos o dividí la app.",refused:"El modelo no quiso hacer ese pedido. Reformulalo.",image_rejected:"No se pudo usar esa imagen. Probá con un PNG o JPG más chico.",upstream_error:"Se cortó la conexión con el modelo. Probá de nuevo."};
+  return map[c]||(e&&e.message)||"Algo falló al pedir la respuesta. Probá de nuevo."}
+function finish(kind,req,text,truncated){
+  const p=cur();
+  if(kind==="chat"){addMsg({role:"ai",text:text.trim(),tag:"Charla"});return}
+  const s=parseAnswer(text);
+  if(s.open||(truncated&&!s.edits.length)){addMsg({role:"ai",text:(s.expl||"")+"\n\nLa respuesta quedó cortada y no la apliqué para no romper la app.",acts:[{type:"continue",label:"Seguir escribiendo",req,partial:text,kind,primary:true}]});return}
+  const before=p.files;let fs=(kind==="new")?{}:Object.assign({},before);
+  for(const d of s.deletes)if(d!=="index.html")delete fs[d];
+  for(const f of s.files)fs[f.name]=f.content;
+  const failed=[];let okN=0,changed=0;
+  for(const e of s.edits){
+    const names=Object.keys(fs);let fn=e.file&&fs[e.file]!=null?e.file:(e.file?null:(names.length===1?names[0]:(fs["index.html"]!=null?"index.html":null)));
+    if(!fn&&e.file){const alt=names.find(n=>n.endsWith("/"+e.file)||e.file.endsWith("/"+n));if(alt)fn=alt}
+    if(!fn){failed.push({reason:"el archivo "+(e.file||"?")+" no existe"});continue}
+    const r=applyEdit(fs[fn],e);if(r.ok){fs[fn]=r.code;okN++;changed+=r.n}else failed.push({reason:r.reason,file:fn});
+  }
+  const touched=s.files.length+s.deletes.length+okN;
+  if(!entryOf(fs)){addMsg({role:"ai",text:s.expl||text.trim(),tag:"Sin cambios"});addMsg({role:"note",kind:"bad",text:"La respuesta no trajo una app completa (falta index.html), así que no cambié nada.",acts:hasApp(p)?[{type:"rewrite",label:"Rehacer archivos completos",req}]:null});return}
+  if(!touched){
+    addMsg({role:"ai",text:s.expl||text.trim(),tag:"Sin cambios"});
+    if(s.edits.length)addMsg({role:"note",kind:"bad",text:"No pude aplicar ninguno de los "+s.edits.length+" cambios: el código a reemplazar "+(failed[0]&&failed[0].reason)+". Tu app quedó igual.",acts:[{type:"rewrite",label:"Rehacer archivos completos",req,primary:true}]});
+    else addMsg({role:"note",text:"La respuesta no trajo código, así que la app quedó igual."});
+    return;
+  }
+  commit(fs,req);
+  const tag=kind==="new"?"Nueva app":s.edits.length?(okN+" cambio"+(okN===1?"":"s")+(s.files.length?" + "+s.files.length+" archivo"+(s.files.length>1?"s":""):"")+" · ~"+changed+" líneas"):(s.files.length+" archivo"+(s.files.length>1?"s":"")+" completo"+(s.files.length>1?"s":""));
+  addMsg({role:"ai",text:s.expl||"Listo.",tag});
+  if(failed.length)addMsg({role:"note",kind:"bad",text:"Apliqué "+okN+" de "+s.edits.length+" cambios. "+failed.length+" no se pudo porque el código a reemplazar "+failed[0].reason+".",acts:[{type:"rewrite",label:"Rehacer archivos completos",req}]});
+  const sql=s.files.find(f=>f.name==="supabase.sql");
+  if(sql){const ref=((p.db&&p.db.url)||"").match(/https?:\/\/([a-z0-9]+)\.supabase\.co/i);
+    addMsg({role:"note",kind:"ok",text:"Esta app necesita tablas en tu base de datos. Copiá el SQL y pegalo en Supabase → SQL Editor → Run. Se hace una vez (y cada vez que cambien las tablas).",acts:[{type:"sql",label:"Copiar SQL",primary:true}].concat(ref?[{type:"link",label:"Abrir SQL Editor",href:"https://supabase.com/dashboard/project/"+ref[1]+"/sql/new"}]:[])})}
+  if(isSmall())setMob("view");else{wtab="view";renderWork()}
+}
+/* acciones extra */
+const _doAct=doAct;doAct=function(act){if(act.type==="settings"){openSettings();return}_doAct(act)};
+
+/* ---------- descargas ---------- */
+let dlCap;async function getDl(){if(dlCap!==undefined)return dlCap;dlCap=null;if(hasClaude){try{dlCap=await window.claude.use("downloads")}catch(e){dlCap=null}}return dlCap}
+async function saveFile(name,data,mime){const d=await getDl();if(d){try{await d.save({filename:name,data});toast("Descargado: "+name)}catch(e){if(e&&e.code!=="declined")toast("No se pudo descargar ("+(e.code||"error")+").")}return}
+  if(hasClaude){toast("Esta vista no permite descargar archivos.");return}
+  const blob=data instanceof Blob?data:new Blob([data],{type:mime||"text/plain"});const url=URL.createObjectURL(blob);const a=h("a",{href:url,download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);toast("Descargado: "+name)}
+function loadScript(src,global){return new Promise((ok,ko)=>{if(window[global])return ok(window[global]);const s=document.createElement("script");s.src=src;s.onload=()=>window[global]?ok(window[global]):ko(new Error("no cargó"));s.onerror=()=>ko(new Error("no cargó"));document.head.append(s)})}
+async function downloadMain(){const p=cur();if(!hasApp(p)){toast("Todavía no hay app para descargar.");return}const names=Object.keys(p.files);
+  if(names.length===1)return saveFile(slug(p.name)+".html",p.files[names[0]],"text/html");
+  try{const JSZip=await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js","JSZip");const z=new JSZip();for(const n of names)z.file(n,p.files[n]);const blob=await z.generateAsync({type:"blob"});saveFile(slug(p.name)+".zip",blob,"application/zip")}
+  catch(e){toast("No pude armar el ZIP. Te bajo un HTML único.");downloadSingle()}}
+function downloadSingle(){const p=cur();if(!hasApp(p))return;saveFile(slug(p.name)+".html",assemble(p.files),"text/html")}
+$("#dlBtn").addEventListener("click",downloadMain);
+function selfSource(){try{const c=document.documentElement.cloneNode(true);c.removeAttribute("data-theme");c.querySelectorAll("script").forEach(s=>{if(s.id!=="forja-app")s.remove()});c.querySelectorAll(".scrim,.drawer,.toast").forEach(x=>x.remove());const m=c.querySelector("#main");if(m)m.innerHTML="";return"<!doctype html>\n"+c.outerHTML}catch(e){return null}}
+const SELF_SRC=selfSource();
+
+/* ---------- GitHub Pages ---------- */
+async function gh(path,opt={}){const r=await fetch("https://api.github.com"+path,Object.assign({},opt,{headers:Object.assign({"Accept":"application/vnd.github+json","Authorization":"Bearer "+settings.gh.token,"X-GitHub-Api-Version":"2022-11-28"},opt.body?{"Content-Type":"application/json"}:{},opt.headers||{})}));
+  let j=null;try{j=await r.json()}catch(e){}return{ok:r.ok,status:r.status,j}}
+async function ghPublish(repo,files,desc,onStep){
+  onStep("Revisando tu cuenta de GitHub…");const u=await gh("/user");if(!u.ok)throw{message:u.status===401?"El token de GitHub no es válido. Creá uno nuevo.":"GitHub no respondió ("+u.status+")."};
+  const login=u.j.login;settings.gh.login=login;persist();
+  let rp=await gh("/repos/"+login+"/"+repo);
+  if(rp.status===404){onStep("Creando el repositorio "+repo+"…");const c=await gh("/user/repos",{method:"POST",body:JSON.stringify({name:repo,description:desc,auto_init:true,private:false})});if(!c.ok)throw{message:"No pude crear el repositorio ("+c.status+"): "+((c.j&&c.j.message)||"")+(c.status===403?". Revisá que el token tenga el permiso 'repo'.":"")};rp=c;await new Promise(r=>setTimeout(r,1500))}
+  else if(!rp.ok)throw{message:"No pude leer el repositorio ("+rp.status+")."};
+  const branch=rp.j.default_branch||"main";
+  const all=Object.assign({".nojekyll":""},files);
+  for(const n of Object.keys(all)){onStep("Subiendo "+n+"…");const ex=await gh("/repos/"+login+"/"+repo+"/contents/"+encodeURI(n)+"?ref="+branch);
+    const body={message:"Forja: "+n,content:utf8b64(all[n]),branch};if(ex.ok&&ex.j&&ex.j.sha)body.sha=ex.j.sha;
+    const put=await gh("/repos/"+login+"/"+repo+"/contents/"+encodeURI(n),{method:"PUT",body:JSON.stringify(body)});if(!put.ok)throw{message:"No pude subir "+n+" ("+put.status+"): "+((put.j&&put.j.message)||"")}}
+  onStep("Activando la página web…");
+  const pg=await gh("/repos/"+login+"/"+repo+"/pages",{method:"POST",body:JSON.stringify({source:{branch,path:"/"}})});
+  if(!pg.ok&&pg.status!==409&&pg.status!==422)throw{message:"Subí los archivos pero no pude activar GitHub Pages ("+pg.status+"). Activalo en el repositorio → Settings → Pages."};
+  return"https://"+login.toLowerCase()+".github.io/"+repo+"/";
+}
+function openPublish(){drawer("Publicar con un link",(b)=>{
+  const p=cur();
+  if(!WEB){b.append(h("div",{class:"group"},h("h3",{},"Publicar desde la web"),h("p",{},"Dentro de Claude, Forja no puede conectarse a GitHub. Abrí Forja en la web para publicar tus apps con un link gratis, o descargá la app y subila donde quieras."),h("div",{class:"row"},h("button",{class:"btn",onclick:downloadMain},"Descargar la app"))));return}
+  if(!hasApp(p)){b.append(h("p",{class:"hint"},"Primero construí una app en este proyecto."));return}
+  const tok=h("input",{id:"ghTok",type:"password",value:settings.gh.token||"",autocomplete:"off",placeholder:"ghp_…"});
+  tok.addEventListener("change",()=>{settings.gh.token=tok.value.trim();persist()});
+  const repo=h("input",{id:"ghRepo",value:(p.pub&&p.pub.repo)||slug(p.name)});
+  const st=h("div",{class:"hint","aria-live":"polite"});const out=h("div",{});
+  const showUrl=url=>{out.innerHTML="";out.append(h("div",{class:"callout ok"},h("div",{},"Tu app está publicada en:"),h("div",{class:"url"},url),h("div",{class:"row",style:"margin-top:6px"},h("a",{class:"btn primary",href:url,target:"_blank",rel:"noopener"},"Abrir"),h("button",{class:"btn",onclick:()=>copyText(url)},"Copiar link")),h("small",{class:"hint"},"La primera vez GitHub tarda 1 o 2 minutos en mostrarla.")))};
+  if(p.pub&&p.pub.url)showUrl(p.pub.url);
+  const go=h("button",{class:"btn primary",onclick:async()=>{settings.gh.token=tok.value.trim();if(!settings.gh.token){tok.focus();st.textContent="Falta el token de GitHub.";return}
+    const r=slug(repo.value);go.disabled=true;
+    try{const files=Object.assign({},p.files);delete files["supabase.sql"];const url=await ghPublish(r,files,"App creada con Forja: "+p.name,s=>st.textContent=s);p.pub={repo:r,url,ts:Date.now()};persist();st.textContent="";showUrl(url);addMsg({role:"note",kind:"ok",text:"Publicada en "+url,acts:[{type:"link",label:"Abrir",href:url}]})}
+    catch(e){st.textContent=(e&&e.message)||"No se pudo publicar."}finally{go.disabled=false}}},p.pub?"Actualizar publicación":"Publicar");
+  b.append(h("div",{class:"group"},h("h3",{},"Tu app en internet, gratis"),
+    h("p",{class:"hint"},"Forja la sube a tu GitHub y la deja online con GitHub Pages. Cualquiera con el link la puede usar."),
+    h("ol",{class:"steps"},h("li",{},"Creá un token: ",h("a",{href:"https://github.com/settings/tokens/new?scopes=repo&description=Forja",target:"_blank",rel:"noopener"},"github.com/settings/tokens/new")," (ya viene marcado el permiso repo). Elegí vencimiento y tocá Generate token."),h("li",{},"Copiá el token y pegalo acá. Queda guardado solo en este navegador.")),
+    h("div",{class:"field"},h("label",{for:"ghTok"},"Token de GitHub"),tok),
+    h("div",{class:"field"},h("label",{for:"ghRepo"},"Nombre del repositorio"),repo,h("small",{},"Será parte del link: tu-usuario.github.io/"+slug(repo.value||"app"))),
+    h("div",{class:"row"},go),st,out));
+})}
+$("#pubBtn").addEventListener("click",openPublish);
+
+/* ---------- cajones ---------- */
+function drawer(title,build){
+  const sc=h("div",{class:"scrim",onclick:()=>close()});const d=h("aside",{class:"drawer",role:"dialog","aria-modal":"true","aria-label":title});
+  const close=()=>{sc.remove();d.remove();document.removeEventListener("keydown",esc)};const esc=e=>{if(e.key==="Escape")close()};document.addEventListener("keydown",esc);
+  const body=h("div",{class:"body"});d.append(h("header",{},h("h2",{},title),h("button",{class:"btn",onclick:close},"Cerrar")),body);build(body,close);document.body.append(sc,d);
+  const f=d.querySelector("input,select,textarea");(f||d.querySelector("button")).focus();return close;
+}
+function openProjects(){drawer("Proyectos",(b,close)=>{
+  const p=cur();
+  const name=h("input",{id:"pName",value:p.name});name.addEventListener("change",()=>{p.name=name.value.trim()||"Sin nombre";persist();renderTop()});
+  const notes=h("textarea",{id:"pNotes",placeholder:"Ej: la app es para mi taller mecánico; colores azul y gris; todo en pesos; usuarios mayores, letra grande."});notes.value=p.notes;notes.addEventListener("input",()=>{p.notes=notes.value;persist()});
+  b.append(h("div",{class:"group"},h("h3",{},"Este proyecto"),
+    h("div",{class:"field"},h("label",{for:"pName"},"Nombre"),name),
+    h("div",{class:"field"},h("label",{for:"pNotes"},"Memoria del proyecto"),notes,h("small",{},"Forja lee esto en cada pedido, así no se olvida de lo importante aunque el proyecto crezca."))));
+  /* base de datos */
+  const dbu=h("input",{id:"dbUrl",value:p.db.url,placeholder:"https://xxxx.supabase.co",autocomplete:"off",spellcheck:"false"});
+  const dbk=h("input",{id:"dbKey",value:p.db.anon,placeholder:"eyJhbGciOi…",autocomplete:"off",spellcheck:"false"});
+  const dbst=h("div",{class:"hint"});
+  const saveDb=()=>{p.db={url:dbu.value.trim().replace(/\/+$/,""),anon:dbk.value.trim()};persist();dbst.textContent=p.db.url&&p.db.anon?"Guardado. Desde ahora Forja usa esta base de datos en este proyecto.":"Sin base de datos en este proyecto."};
+  dbu.addEventListener("change",saveDb);dbk.addEventListener("change",saveDb);
+  const testDb=h("button",{class:"btn",onclick:async()=>{saveDb();if(!WEB){dbst.textContent="La prueba solo funciona en Forja web.";return}if(!p.db.url||!p.db.anon){dbst.textContent="Completá la URL y la clave.";return}dbst.textContent="Probando…";
+    try{const r=await fetch(p.db.url+"/auth/v1/settings",{headers:{apikey:p.db.anon}});dbst.textContent=r.ok?"Conectado a Supabase.":"Supabase respondió "+r.status+". Revisá la URL y la clave anon."}catch(e){dbst.textContent="No se pudo conectar. Revisá la URL."}}},"Probar conexión");
+  b.append(h("div",{class:"group"},h("h3",{},"Base de datos y usuarios"),
+    h("p",{class:"hint"},"Para apps con login, datos compartidos entre varias personas o que se guardan en la nube. Usa Supabase, que tiene plan gratis."),
+    h("ol",{class:"steps"},h("li",{},"Creá una cuenta y un proyecto en ",h("a",{href:"https://supabase.com/dashboard/new",target:"_blank",rel:"noopener"},"supabase.com"),"."),h("li",{},"En el proyecto: Project Settings → API (o Data API). Copiá la ",h("b",{},"Project URL")," y la clave ",h("b",{},"anon public"),"."),h("li",{},"Para probar login sin confirmar emails: Authentication → Sign In / Providers → Email → desactivá Confirm email.")),
+    h("div",{class:"field"},h("label",{for:"dbUrl"},"Project URL"),dbu),h("div",{class:"field"},h("label",{for:"dbKey"},"Clave anon public"),dbk,h("small",{},"Es la clave pública: está bien que vaya dentro de la app. Nunca pegues la service_role.")),
+    h("div",{class:"row"},testDb),dbst));
+  const list=h("div",{class:"plist"});
+  const draw=()=>{list.innerHTML="";for(const q of projects.slice().sort((a,b)=>b.updated-a.updated)){
+    let armed=false;const del=h("button",{class:"btn danger",onclick:()=>{if(!armed){armed=true;del.textContent="¿Seguro?";setTimeout(()=>{armed=false;del.textContent="Borrar"},3000);return}
+      projects=projects.filter(x=>x!==q);if(!projects.length)projects=[newProject("Proyecto nuevo")];if(curId===q.id)curId=projects[0].id;persist();draw();refreshAll()}},"Borrar");
+    list.append(h("div",{class:"pitem"+(q.id===curId?" cur":"")},h("div",{class:"t"},h("div",{},q.name),h("small",{},fmtTime(q.updated)+" · "+q.versions.length+" versiones"+(q.pub?" · publicada":""))),
+      q.id===curId?h("span",{class:"badge"},"Abierto"):h("button",{class:"btn",onclick:()=>{curId=q.id;previewFiles=null;lastErrors=[];picked=null;curFile="index.html";persist();refreshAll();close()}},"Abrir"),
+      h("button",{class:"btn",title:"Duplicar",onclick:()=>{const c=JSON.parse(JSON.stringify(q));c.id=uid();c.name=q.name+" (copia)";c.pub=null;c.updated=Date.now();projects.push(c);persist();draw()}},"Duplicar"),del))}};
+  draw();
+  const imp=h("input",{type:"file",accept:".json,application/json",hidden:true,onchange:async e=>{const f=e.target.files[0];if(!f)return;try{const j=JSON.parse(await f.text());const arr=Array.isArray(j)?j:(j.projects||[j]);let n=0;for(const q of arr){if(q&&(q.files||typeof q.html==="string")){projects.push(migrate(Object.assign(newProject(q.name||"Importado"),q,{id:uid()})));n++}}persist();draw();toast(n+" proyecto(s) importado(s)")}catch(err){toast("Ese archivo no es una copia de Forja.")}}});
+  b.append(h("div",{class:"group"},h("h3",{},"Todos tus proyectos"),h("div",{class:"row"},
+      h("button",{class:"btn primary",onclick:()=>{const q=newProject("Proyecto nuevo");projects.push(q);curId=q.id;previewFiles=null;lastErrors=[];picked=null;curFile="index.html";persist();refreshAll();close();setMob("chat");const t=$("#prompt");t&&t.focus()}},"Nuevo proyecto"),
+      h("button",{class:"btn",onclick:()=>saveFile("forja-proyectos-"+today+".json",JSON.stringify({app:"forja",v:2,projects},null,1),"application/json")},"Exportar copia"),
+      h("button",{class:"btn",onclick:()=>imp.click()},"Importar"),imp),list,
+    h("small",{class:"hint"},"Tus proyectos se guardan en este navegador. Exportá una copia de vez en cuando para no perderlos o para pasarlos a otra compu.")));
+})}
+$("#projBtn").addEventListener("click",openProjects);
+function openSettings(){drawer("Ajustes",(b)=>{
+  const opts=Object.entries(ENGINES).filter(([k])=>k!=="claude"||hasClaude);
+  const sel=h("select",{id:"engSel"},...opts.map(([k,v])=>h("option",{value:k,selected:settings.engine===k},v)));
+  const box=h("div",{style:"display:flex;flex-direction:column;gap:12px"});
+  const fld=(id,label,el,small)=>h("div",{class:"field"},h("label",{for:id},label),el,small?h("small",{},small):null);
+  const inp=(id,val,on,type,list)=>{const i=h("input",{id,type:type||"text",value:val||"",autocomplete:"off",spellcheck:"false",list:list||null});i.addEventListener("change",()=>{on(i.value.trim());persist();renderTop();renderComposer();renderMsgs()});return i};
+  const st=h("div",{class:"hint","aria-live":"polite"});
+  const modelPicker=(eng,loader,needKey)=>{const dl=h("datalist",{id:"dl-"+eng});const mi=inp("m-"+eng,settings.models[eng],v=>settings.models[eng]=v,"text","dl-"+eng);
+    const lb=h("button",{class:"btn",onclick:async()=>{if(needKey&&!settings.keys[eng]){st.textContent="Primero pegá la clave.";return}st.textContent="Buscando modelos…";
+      try{const ms=await loader();dl.innerHTML="";ms.slice(0,80).forEach(m=>dl.append(h("option",{value:m})));if(ms.length){if(!settings.models[eng]||!ms.includes(settings.models[eng])){settings.models[eng]=ms[0];mi.value=ms[0];persist();renderTop();renderComposer();renderMsgs()}st.textContent=ms.length+" modelos disponibles. Elegí uno de la lista o dejá el recomendado ("+ms[0]+")."}else st.textContent="No encontré modelos."}catch(e){st.textContent=(e&&e.message)||"No pude cargar la lista."}}},"Cargar modelos");
+    return h("div",{class:"field"},h("label",{for:"m-"+eng},"Modelo"),h("div",{class:"row"},h("div",{style:"flex:1;min-width:160px"},mi),lb),dl)};
+  const testB=h("button",{class:"btn",onclick:async()=>{st.textContent="Probando conexión…";try{const r=await callAI([{role:"user",content:"Respondé solo con la palabra: listo"}],{quick:true});usage.calls--;st.textContent="Funciona. El modelo respondió: "+r.text.trim().slice(0,40)}catch(e){st.textContent=errText(e)}}},"Probar conexión");
+  const draw=()=>{box.innerHTML="";const e=settings.engine;
+    if(!WEB&&e!=="claude")box.append(h("div",{class:"callout"},"Dentro de Claude esta página no puede conectarse a otros proveedores. Usá Forja en la web para este motor."));
+    if(e==="claude"){
+      box.append(h("p",{class:"hint"},"Usa tu cuenta de Claude, dentro del límite de uso de tu plan. La primera vez te pide permiso."));
+      const t=h("select",{id:"tier"},...[["quick","Rápido (cambios chicos)"],["default","Normal (recomendado)"],["complex","Máximo (apps grandes, tarda más)"]].map(([k,v])=>h("option",{value:k,selected:settings.tier===k},v)));
+      t.addEventListener("change",()=>{settings.tier=t.value;persist()});box.append(fld("tier","Potencia",t));
+    }
+    if(e==="gemini"){box.append(h("p",{class:"hint"},"Gratis con cupo diario. Sacá la clave en ",h("a",{href:"https://aistudio.google.com/apikey",target:"_blank",rel:"noopener"},"aistudio.google.com/apikey")," → Create API key."),
+      fld("k-gemini","Clave de Gemini",inp("k-gemini",settings.keys.gemini,v=>settings.keys.gemini=v,"password")),modelPicker("gemini",()=>listGemini(settings.keys.gemini),true))}
+    if(e==="openrouter"){box.append(h("p",{class:"hint"},"Una sola clave para muchos modelos. Los que terminan en :free no cobran (unos 200 pedidos por día). Clave en ",h("a",{href:"https://openrouter.ai/keys",target:"_blank",rel:"noopener"},"openrouter.ai/keys"),"."),
+      fld("k-openrouter","Clave de OpenRouter",inp("k-openrouter",settings.keys.openrouter,v=>settings.keys.openrouter=v,"password")),modelPicker("openrouter",listOpenRouterFree,false))}
+    if(e==="anthropic"){box.append(h("p",{class:"hint"},"Pagás directo a Anthropic por lo que uses, sin recargo. Clave en ",h("a",{href:"https://console.anthropic.com/settings/keys",target:"_blank",rel:"noopener"},"console.anthropic.com"),"."),
+      fld("k-anthropic","Clave de Anthropic",inp("k-anthropic",settings.keys.anthropic,v=>settings.keys.anthropic=v,"password")),fld("m-anthropic","Modelo",inp("m-anthropic",settings.models.anthropic,v=>settings.models.anthropic=v),"Ej: claude-sonnet-5-5"))}
+    if(e==="openai"){box.append(h("p",{class:"hint"},"Cualquier servicio compatible con OpenAI: OpenAI, Groq, Together, DeepSeek y otros."),
+      fld("bURL","Dirección de la API",inp("bURL",settings.baseUrl,v=>settings.baseUrl=v),"Ej: https://api.groq.com/openai/v1"),fld("k-openai","Clave",inp("k-openai",settings.keys.openai,v=>settings.keys.openai=v,"password")),fld("m-openai","Modelo",inp("m-openai",settings.models.openai,v=>settings.models.openai=v)))}
+    box.append(h("div",{class:"row"},testB),st);
+    if(e!=="claude")box.append(h("small",{class:"hint"},"Las claves quedan guardadas solo en este navegador y se mandan únicamente al proveedor elegido."));
+  };
+  sel.addEventListener("change",()=>{settings.engine=sel.value;st.textContent="";persist();draw();renderTop();renderComposer();renderMsgs()});
+  draw();
+  b.append(h("div",{class:"group"},h("h3",{},"Motor de IA"),fld("engSel","Quién escribe el código",sel),box));
+  const th=h("select",{id:"thSel"},...[["","Como el sistema"],["light","Claro"],["dark","Oscuro"]].map(([k,v])=>h("option",{value:k,selected:(store.get("theme","")===k)},v)));
+  th.addEventListener("change",()=>{store.set("theme",th.value);applyTheme()});
+  b.append(h("div",{class:"group"},h("h3",{},"Apariencia"),fld("thSel","Tema",th)));
+  if(SELF_SRC)b.append(h("div",{class:"group"},h("h3",{},"Copia de Forja"),h("p",{class:"hint"},"Descargá Forja como archivo .html para tenerla de respaldo o abrirla con doble clic en cualquier navegador."),h("div",{},h("button",{class:"btn",onclick:()=>saveFile("forja.html",SELF_SRC,"text/html")},"Descargar Forja"))));
+})}
+$("#setBtn").addEventListener("click",openSettings);
+$("#engineChip").addEventListener("click",openSettings);
+function applyTheme(){const t=store.get("theme","");if(t)document.documentElement.setAttribute("data-theme",t);else if(!hasClaude)document.documentElement.removeAttribute("data-theme")}
+
+function refreshAll(){renderTop();renderMsgs();renderComposer();renderWork()}
+applyTheme();refreshAll();layoutTop();window.addEventListener("resize",layoutTop);
+try{document.fonts&&document.fonts.ready.then(layoutTop)}catch(e){}setTimeout(layoutTop,600);
+initClaude();
+})();
+</script>
+</body></html>
