@@ -474,7 +474,7 @@ function renderMsgs(){
 }
 function setupCard(){
   if(!WEB)return h("div",{class:"setup"},h("h2",{},"Claude no está disponible acá"),h("p",{},"Abrí Forja dentro de Claude o en la web y elegí un motor gratis en Ajustes."));
-  const key=h("input",{id:"quickKey",type:"password",placeholder:"Pegá acá la clave (empieza con AIza…)",autocomplete:"off"});
+  const key=h("input",{id:"quickKey",type:"password",placeholder:"Pegá acá la clave de Gemini",autocomplete:"off"});
   const st=h("div",{class:"hint"});
   const go=h("button",{class:"btn primary",onclick:async()=>{const k=key.value.trim();if(!k){key.focus();return}go.disabled=true;st.textContent="Probando la clave…";
     try{const ms=await listGemini(k);if(!ms.length)throw{message:"La clave funciona pero no encontré modelos disponibles."};settings.engine="gemini";settings.keys.gemini=k;settings.models.gemini=ms[0];persist();
